@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/entities/imu_entities.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/qa_bloc.dart';
 import '../bloc/qa_event.dart';
 
@@ -19,14 +20,14 @@ class ResultsView extends StatelessWidget {
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(24),
             child: Center(
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 1000),
                 child: Column(
                   children: [
                     _buildSummaryCard(passCount, warnCount, failCount),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
                     _buildResultsList(),
                   ],
                 ),
@@ -48,55 +49,42 @@ class ResultsView extends StatelessWidget {
         : QaStatus.pass;
 
     return Container(
-      padding: const EdgeInsets.all(48),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF1E2749),
-            const Color(0xFF151B35),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: _getStatusColor(overallStatus).withOpacity(0.3),
-          width: 2,
-        ),
-      ),
+      padding: const EdgeInsets.all(40),
+      decoration: AppDecorations.cardDecoration(borderColor: overallStatus.color.withOpacity(0.3)),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            _getStatusIcon(overallStatus),
-            size: 80,
-            color: _getStatusColor(overallStatus),
+            overallStatus.icon,
+            size: 64,
+            color: overallStatus.color,
           ),
-          const SizedBox(height: 24),
-          Text(
+          const SizedBox(height: 20),
+          const Text(
             'Test Complete',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 32,
+            style: TextStyle(
+              color: AppColors.white,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Text(
             'Tested $total device${total != 1 ? 's' : ''}',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 18,
+              color: AppColors.whiteWithOpacity(0.7),
+              fontSize: 16,
             ),
           ),
-          const SizedBox(height: 32),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
             children: [
-              _buildStatusBadge('Pass', pass, Colors.green),
-              const SizedBox(width: 16),
-              _buildStatusBadge('Warn', warn, Colors.orange),
-              const SizedBox(width: 16),
-              _buildStatusBadge('Fail', fail, Colors.red),
+              _buildStatusBadge('Pass', pass, AppColors.green),
+              _buildStatusBadge('Warn', warn, AppColors.orange),
+              _buildStatusBadge('Fail', fail, AppColors.red),
             ],
           ),
         ],
@@ -106,31 +94,25 @@ class ResultsView extends StatelessWidget {
 
   Widget _buildStatusBadge(String label, int count, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 2,
-        ),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: AppDecorations.statusBadge(color),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: TextStyle(
               color: color,
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             '$count',
             style: TextStyle(
               color: color,
-              fontSize: 32,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -142,10 +124,10 @@ class ResultsView extends StatelessWidget {
   Widget _buildResultsList() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF151B35),
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.blue.withOpacity(0.2),
+          color: AppColors.blueWithOpacity(0.2),
           width: 2,
         ),
       ),
@@ -153,23 +135,19 @@ class ResultsView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             child: Text(
               'Device Results',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: AppTextStyles.heading.copyWith(fontSize: 20),
             ),
           ),
-          const Divider(color: Colors.white12, height: 1),
+          Divider(color: AppColors.whiteWithOpacity(0.12), height: 1),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: results.length,
-            separatorBuilder: (context, index) => const Divider(
-              color: Colors.white12,
+            separatorBuilder: (context, index) => Divider(
+              color: AppColors.whiteWithOpacity(0.12),
               height: 1,
             ),
             itemBuilder: (context, index) {
@@ -184,93 +162,78 @@ class ResultsView extends StatelessWidget {
 
   Widget _buildResultItem(QaResult result, int number) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      child: Row(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: _getStatusColor(result.status).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _getStatusColor(result.status).withOpacity(0.3),
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                '$number',
-                style: TextStyle(
-                  color: _getStatusColor(result.status),
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  result.deviceId,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: AppDecorations.statusBadge(result.status.color),
+                child: Center(
+                  child: Text(
+                    '$number',
+                    style: TextStyle(
+                      color: result.status.color,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildMetricChip(
-                      'Gravity',
-                      '${result.gravityMeanG.toStringAsFixed(2)}g',
-                    ),
-                    const SizedBox(width: 8),
-                    _buildMetricChip(
-                      'MAC',
-                      '${result.macDeg.toStringAsFixed(3)}°',
+                    Text(
+                      result.deviceId,
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            decoration: BoxDecoration(
-              color: _getStatusColor(result.status).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _getStatusColor(result.status).withOpacity(0.3),
-                width: 2,
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _getStatusIcon(result.status),
-                  color: _getStatusColor(result.status),
-                  size: 20,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: AppDecorations.statusBadge(result.status.color),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      result.status.icon,
+                      color: result.status.color,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      result.status.label,
+                      style: TextStyle(
+                        color: result.status.color,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  result.status == QaStatus.pass
-                      ? 'PASS'
-                      : result.status == QaStatus.warn
-                      ? 'WARN'
-                      : 'FAIL',
-                  style: TextStyle(
-                    color: _getStatusColor(result.status),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildMetricChip('Gravity', '${result.gravityMeanG.toStringAsFixed(3)}g'),
+              _buildMetricChip('MAC', '${result.macDeg.toStringAsFixed(3)}°'),
+              _buildMetricChip('Noise σ', '${result.noiseSigma.toStringAsFixed(3)}°'),
+              _buildMetricChip('Drift', '${result.driftDegPerMin.toStringAsFixed(3)}°/min'),
+              _buildMetricChip('Abnormal', '${result.abnormalCount}'),
+            ],
           ),
         ],
       ),
@@ -279,12 +242,12 @@ class ResultsView extends StatelessWidget {
 
   Widget _buildMetricChip(String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: AppColors.whiteWithOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: AppColors.whiteWithOpacity(0.1),
           width: 1,
         ),
       ),
@@ -294,15 +257,15 @@ class ResultsView extends StatelessWidget {
           Text(
             '$label: ',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 12,
+              color: AppColors.whiteWithOpacity(0.5),
+              fontSize: 11,
             ),
           ),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
+              color: AppColors.white,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -313,12 +276,12 @@ class ResultsView extends StatelessWidget {
 
   Widget _buildBottomBar(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF151B35),
+        color: AppColors.surface,
         border: Border(
           top: BorderSide(
-            color: Colors.blue.withOpacity(0.2),
+            color: AppColors.blueWithOpacity(0.2),
             width: 2,
           ),
         ),
@@ -332,45 +295,23 @@ class ResultsView extends StatelessWidget {
             label: const Text(
               'Test Again',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: AppColors.blue,
               padding: const EdgeInsets.symmetric(
-                horizontal: 40,
-                vertical: 20,
+                horizontal: 32,
+                vertical: 16,
               ),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
         ],
       ),
     );
-  }
-
-  Color _getStatusColor(QaStatus status) {
-    switch (status) {
-      case QaStatus.pass:
-        return Colors.green;
-      case QaStatus.warn:
-        return Colors.orange;
-      case QaStatus.fail:
-        return Colors.red;
-    }
-  }
-
-  IconData _getStatusIcon(QaStatus status) {
-    switch (status) {
-      case QaStatus.pass:
-        return Icons.check_circle;
-      case QaStatus.warn:
-        return Icons.warning;
-      case QaStatus.fail:
-        return Icons.error;
-    }
   }
 }

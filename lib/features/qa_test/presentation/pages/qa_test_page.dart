@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/qa_bloc.dart';
 import '../bloc/qa_event.dart';
 import '../bloc/qa_state.dart';
@@ -26,100 +26,93 @@ class _QaTestPageState extends State<QaTestPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E27),
+      backgroundColor: AppColors.primary,
       body: BlocConsumer<QaBloc, QaState>(
         listener: (context, state) {
           if (state.phase == QaTestPhase.error) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.errorMessage ?? 'An error occurred'),
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.red,
               ),
             );
           }
         },
         builder: (context, state) {
-          return Stack(
-            children: [
-              _buildBackground(),
-              SafeArea(
-                child: Column(
-                  children: [
-                    _buildAppBar(context, state),
-                    Expanded(
-                      child: _buildContent(context, state),
-                    ),
-                  ],
-                ),
+          return Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary,
+                  AppColors.secondary,
+                  AppColors.primary,
+                ],
+                stops: [0.0, 0.5, 1.0],
               ),
-            ],
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _buildAppBar(context, state),
+                  Expanded(
+                    child: _buildContent(context, state),
+                  ),
+                ],
+              ),
+            ),
           );
         },
       ),
     );
   }
 
-  Widget _buildBackground() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF0A0E27),
-            const Color(0xFF1A1F3A),
-            const Color(0xFF0A0E27),
-          ],
-          stops: const [0.0, 0.5, 1.0],
-        ),
-      ),
-    );
-  }
-
   Widget _buildAppBar(BuildContext context, QaState state) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.blueWithOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: Colors.blue.withOpacity(0.3),
+                color: AppColors.blueWithOpacity(0.3),
                 width: 1,
               ),
             ),
             child: const Icon(
               Icons.analytics_outlined,
-              color: Colors.blue,
-              size: 28,
+              color: AppColors.blue,
+              size: 24,
             ),
           ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'IMU QA Tester',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'IMU QA Tester',
+                  style: TextStyle(
+                    color: AppColors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-              Text(
-                _getSubtitle(state.phase),
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 14,
+                Text(
+                  _getSubtitle(state.phase),
+                  style: TextStyle(
+                    color: AppColors.whiteWithOpacity(0.6),
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const Spacer(),
           if (state.phase != QaTestPhase.idle &&
               state.phase != QaTestPhase.completed)
             _buildCancelButton(context),
@@ -133,26 +126,27 @@ class _QaTestPageState extends State<QaTestPage> {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => context.read<QaBloc>().add(CancelTestEvent()),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.red.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: AppColors.redWithOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: Colors.red.withOpacity(0.3),
+              color: AppColors.redWithOpacity(0.3),
               width: 1,
             ),
           ),
           child: const Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.close, color: Colors.red, size: 20),
-              SizedBox(width: 8),
+              Icon(Icons.close, color: AppColors.red, size: 18),
+              SizedBox(width: 6),
               Text(
                 'Cancel',
                 style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 14,
+                  color: AppColors.red,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -191,65 +185,66 @@ class _QaTestPageState extends State<QaTestPage> {
         return ResultsView(results: state.results);
       case QaTestPhase.error:
         return _buildErrorView(state);
-      default:
-        return const Center(child: CircularProgressIndicator());
     }
   }
 
   Widget _buildErrorView(QaState state) {
     return Center(
-      child: Container(
-        margin: const EdgeInsets.all(32),
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.red.withOpacity(0.3),
-            width: 2,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 600),
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: AppColors.redWithOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: AppColors.redWithOpacity(0.3),
+              width: 2,
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 64),
-            const SizedBox(height: 24),
-            const Text(
-              'Error',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              state.errorMessage ?? 'An unknown error occurred',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 16,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: () => context.read<QaBloc>().add(ResetTestEvent()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: AppColors.red, size: 56),
+              const SizedBox(height: 20),
+              const Text(
+                'Error',
+                style: TextStyle(
+                  color: AppColors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-              child: const Text(
-                'Try Again',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              const SizedBox(height: 12),
+              Text(
+                state.errorMessage ?? 'An unknown error occurred',
+                style: TextStyle(
+                  color: AppColors.whiteWithOpacity(0.7),
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.read<QaBloc>().add(ResetTestEvent()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.blue,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                child: const Text(
+                  'Try Again',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

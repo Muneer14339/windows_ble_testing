@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 
 class ImuSample extends Equatable {
   final double timestampS;
@@ -108,4 +109,39 @@ class QaConfig extends Equatable {
     maxNoiseSigmaDeg,
     maxDriftDegPerMin,
   ];
+}
+
+extension QaStatusHelper on QaStatus {
+  Color get color {
+    switch (this) {
+      case QaStatus.pass:
+        return Colors.green;
+      case QaStatus.warn:
+        return Colors.orange;
+      case QaStatus.fail:
+        return Colors.red;
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case QaStatus.pass:
+        return Icons.check_circle;
+      case QaStatus.warn:
+        return Icons.warning;
+      case QaStatus.fail:
+        return Icons.error;
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case QaStatus.pass:
+        return 'PASS';
+      case QaStatus.warn:
+        return 'WARN';
+      case QaStatus.fail:
+        return 'FAIL';
+    }
+  }
 }

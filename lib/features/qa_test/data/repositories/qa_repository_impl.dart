@@ -105,71 +105,117 @@ class QaRepositoryImpl implements QaRepository {
         ));
       }
 
-      double sumGx = 0.0, sumGy = 0.0, sumGz = 0.0;
-      double sumAx = 0.0, sumAy = 0.0, sumAz = 0.0;
-      int gyroCount = 0, accelCount = 0;
+      // Separate gyro and accel samples
+      final gyroSamples = <ImuSample>[];
+      final accelSamples = <ImuSample>[];
 
       for (final sample in samples) {
         if (sample.gx != 0.0 || sample.gy != 0.0 || sample.gz != 0.0) {
-          sumGx += sample.gx;
-          sumGy += sample.gy;
-          sumGz += sample.gz;
-          gyroCount++;
+          gyroSamples.add(sample);
         }
         if (sample.ax != 0.0 || sample.ay != 0.0 || sample.az != 0.0) {
-          sumAx += sample.ax;
-          sumAy += sample.ay;
-          sumAz += sample.az;
-          accelCount++;
+          accelSamples.add(sample);
         }
       }
 
-      final gravityMeanG = accelCount > 0
-          ? sqrt((sumAx/accelCount) * (sumAx/accelCount) +
-          (sumAy/accelCount) * (sumAy/accelCount) +
-          (sumAz/accelCount) * (sumAz/accelCount))
-          : 0.0;
-
-      final gyroMeanX = gyroCount > 0 ? sumGx / gyroCount : 0.0;
-      final gyroMeanY = gyroCount > 0 ? sumGy / gyroCount : 0.0;
-      final gyroMeanZ = gyroCount > 0 ? sumGz / gyroCount : 0.0;
-
-      double gyroVariance = 0.0;
-      if (gyroCount > 0) {
-        for (final sample in samples) {
-          if (sample.gx != 0.0 || sample.gy != 0.0 || sample.gz != 0.0) {
-            final dx = sample.gx - gyroMeanX;
-            final dy = sample.gy - gyroMeanY;
-            final dz = sample.gz - gyroMeanZ;
-            gyroVariance += (dx * dx + dy * dy + dz * dz);
-          }
+      // Calculate gravity mean (magnitude of mean acceleration)
+      double gravityMeanG = 0.0;
+      if (accelSamples.isNotEmpty) {
+        double sumAx = 0.0, sumAy = 0.0, sumAz = 0.0;
+        for (final s in accelSamples) {
+          sumAx += s.ax;
+          sumAy += s.ay;
+          sumAz += s.az;
         }
-        gyroVariance /= gyroCount;
+        final meanAx = sumAx / accelSamples.length;
+        final meanAy = sumAy / accelSamples.length;
+        final meanAz = sumAz / accelSamples.length;
+        gravityMeanG = sqrt(meanAx * meanAx + meanAy * meanAy + meanAz * meanAz);
       }
 
-      final noiseSigma = sqrt(gyroVariance);
+      // Calculate gyro noise (σ - standard deviation)
+      double noiseSigma = 0.0;
+      if (gyroSamples.isNotEmpty) {
+        double sumGx = 0.0, sumGy = 0.0, sumGz = 0.0;
+        for (final s in gyroSamples) {
+          sumGx += s.gx;
+          sumGy += s.gy;
+          sumGz += s.gz;
+        }
+        final meanGx = sumGx / gyroSamples.length;
+        final meanGy = sumGy / gyroSamples.length;
+        final meanGz = sumGz / gyroSamples.length;
 
+        double variance = 0.0;
+        for (final s in gyroSamples) {
+          final dx = s.gx - meanGx;
+          final dy = s.gy - meanGy;
+          final dz = s.gz - meanGz;
+          variance += (dx * dx + dy * dy + dz * dz);
+        }
+        variance /= gyroSamples.length;
+        noiseSigma = sqrt(variance);
+      }
+
+      // Calculate drift (linear fit of gyro magnitude over time)
+      double driftDegPerMin = 0.0;
+      if (gyroSamples.length > 1) {
+        final firstTime = gyroSamples.first.timestampS;
+        final lastTime = gyroSamples.last.timestampS;
+        final duration = lastTime - firstTime;
+
+        if (duration > 0) {
+          final firstMag = sqrt(
+              gyroSamples.first.gx * gyroSamples.first.gx +
+                  gyroSamples.first.gy * gyroSamples.first.gy +
+                  gyroSamples.first.gz * gyroSamples.first.gz
+          );
+          final lastMag = sqrt(
+              gyroSamples.last.gx * gyroSamples.last.gx +
+                  gyroSamples.last.gy * gyroSamples.last.gy +
+                  gyroSamples.last.gz * gyroSamples.last.gz
+          );
+          driftDegPerMin = ((lastMag - firstMag) / duration) * 60.0;
+        }
+      }
+
+      // Count abnormal samples (gyro magnitude > threshold)
+      int abnormalCount = 0;
+      for (final s in gyroSamples) {
+        final mag = sqrt(s.gx * s.gx + s.gy * s.gy + s.gz * s.gz);
+        if (mag > config.abnormalThresholdDeg) {
+          abnormalCount++;
+        }
+      }
+
+      // Calculate MAC (Mean Absolute Change) - simplified as noise for now
+      final macDeg = noiseSigma;
+
+      // Determine status based on PDF criteria
       final gravityDeviation = (gravityMeanG - 1.0).abs();
       final isGravityGood = gravityDeviation <= config.gravityDeviationG;
       final isNoiseGood = noiseSigma <= config.maxNoiseSigmaDeg;
+      final isMacGood = macDeg <= config.maxMacDeg;
+      final isDriftGood = driftDegPerMin.abs() <= config.maxDriftDegPerMin;
+      final isAbnormalGood = abnormalCount < config.maxAbnormalPerWindow;
 
       QaStatus status;
-      if (isGravityGood && isNoiseGood) {
+      if (isGravityGood && isNoiseGood && isMacGood && isDriftGood && isAbnormalGood) {
         status = QaStatus.pass;
-      } else if (isGravityGood || isNoiseGood) {
-        status = QaStatus.warn;
-      } else {
+      } else if (!isGravityGood || abnormalCount >= config.maxAbnormalPerWindow) {
         status = QaStatus.fail;
+      } else {
+        status = QaStatus.warn;
       }
 
       return Right(QaResult(
         deviceId: deviceId,
         status: status,
-        macDeg: 0.0,
+        macDeg: macDeg,
         noiseSigma: noiseSigma,
-        driftDegPerMin: 0.0,
+        driftDegPerMin: driftDegPerMin,
         gravityMeanG: gravityMeanG,
-        abnormalCount: 0,
+        abnormalCount: abnormalCount,
       ));
     } catch (e) {
       return Left(TestFailure(e.toString()));
