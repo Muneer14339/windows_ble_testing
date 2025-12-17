@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:win_ble/win_ble.dart';
 import 'package:win_ble/win_file.dart';
 import '../../../../core/entities/imu_entities.dart';
@@ -47,7 +46,7 @@ class BleDataSourceImpl implements BleDataSource {
       controller.add(BleDeviceInfo(
         name: name,
         address: device.address,
-        rssi: int.tryParse(device.rssi) ?? 0,
+        rssi: device.rssi,
       ));
     });
 
@@ -103,26 +102,18 @@ class BleDataSourceImpl implements BleDataSource {
     await WinBle.discoverServices(address);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    await WinBle.subscribeToCharacteristic(
+    final subscription = WinBle.subscribeToCharacteristic(
       address: address,
       serviceId: serviceUuid,
       characteristicId: notifyUuid,
     );
 
-    _connectionSubscriptions[address] =
-        WinBle.characteristicValueStream.listen((event) {
-          if (event.address != address) return;
-          if (event.characteristicId != notifyUuid) return;
-
-          final data = event.value; // Uint8List
-          final sample = _parseImuData(data);
-
-          if (sample != null &&
-              !(_deviceStreams[address]?.isClosed ?? true)) {
-            _deviceStreams[address]!.add(sample);
-          }
-        });
-
+    _connectionSubscriptions[address] = subscription.listen((data) {
+      final sample = _parseImuData(data);
+      if (sample != null && !(_deviceStreams[address]?.isClosed ?? true)) {
+        _deviceStreams[address]!.add(sample);
+      }
+    });
 
     await Future.delayed(const Duration(milliseconds: 200));
 
@@ -177,7 +168,7 @@ class BleDataSourceImpl implements BleDataSource {
       address: address,
       service: serviceUuid,
       characteristic: characteristicId,
-      data: Uint8List.fromList(data),
+      data: data,
       writeWithResponse: true,
     );
   }
