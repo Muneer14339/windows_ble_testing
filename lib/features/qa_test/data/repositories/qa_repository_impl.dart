@@ -105,28 +105,68 @@ class QaRepositoryImpl implements QaRepository {
         ));
       }
 
-      double sumG = 0.0;
-      int countG = 0;
+      double sumGx = 0.0, sumGy = 0.0, sumGz = 0.0;
+      double sumAx = 0.0, sumAy = 0.0, sumAz = 0.0;
+      int gyroCount = 0, accelCount = 0;
 
       for (final sample in samples) {
+        if (sample.gx != 0.0 || sample.gy != 0.0 || sample.gz != 0.0) {
+          sumGx += sample.gx;
+          sumGy += sample.gy;
+          sumGz += sample.gz;
+          gyroCount++;
+        }
         if (sample.ax != 0.0 || sample.ay != 0.0 || sample.az != 0.0) {
-          final mag = sqrt(
-            sample.ax * sample.ax +
-                sample.ay * sample.ay +
-                sample.az * sample.az,
-          );
-          sumG += mag;
-          countG++;
+          sumAx += sample.ax;
+          sumAy += sample.ay;
+          sumAz += sample.az;
+          accelCount++;
         }
       }
 
-      final gravityMeanG = countG > 0 ? sumG / countG : 0.0;
+      final gravityMeanG = accelCount > 0
+          ? sqrt((sumAx/accelCount) * (sumAx/accelCount) +
+          (sumAy/accelCount) * (sumAy/accelCount) +
+          (sumAz/accelCount) * (sumAz/accelCount))
+          : 0.0;
+
+      final gyroMeanX = gyroCount > 0 ? sumGx / gyroCount : 0.0;
+      final gyroMeanY = gyroCount > 0 ? sumGy / gyroCount : 0.0;
+      final gyroMeanZ = gyroCount > 0 ? sumGz / gyroCount : 0.0;
+
+      double gyroVariance = 0.0;
+      if (gyroCount > 0) {
+        for (final sample in samples) {
+          if (sample.gx != 0.0 || sample.gy != 0.0 || sample.gz != 0.0) {
+            final dx = sample.gx - gyroMeanX;
+            final dy = sample.gy - gyroMeanY;
+            final dz = sample.gz - gyroMeanZ;
+            gyroVariance += (dx * dx + dy * dy + dz * dz);
+          }
+        }
+        gyroVariance /= gyroCount;
+      }
+
+      final noiseSigma = sqrt(gyroVariance);
+
+      final gravityDeviation = (gravityMeanG - 1.0).abs();
+      final isGravityGood = gravityDeviation <= config.gravityDeviationG;
+      final isNoiseGood = noiseSigma <= config.maxNoiseSigmaDeg;
+
+      QaStatus status;
+      if (isGravityGood && isNoiseGood) {
+        status = QaStatus.pass;
+      } else if (isGravityGood || isNoiseGood) {
+        status = QaStatus.warn;
+      } else {
+        status = QaStatus.fail;
+      }
 
       return Right(QaResult(
         deviceId: deviceId,
-        status: QaStatus.pass,
+        status: status,
         macDeg: 0.0,
-        noiseSigma: 0.0,
+        noiseSigma: noiseSigma,
         driftDegPerMin: 0.0,
         gravityMeanG: gravityMeanG,
         abnormalCount: 0,

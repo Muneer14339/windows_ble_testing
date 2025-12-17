@@ -59,50 +59,52 @@ class _DeviceInputCardState extends State<DeviceInputCard>
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 600),
-            margin: const EdgeInsets.all(32),
-            padding: const EdgeInsets.all(48),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF1E2749),
-                  const Color(0xFF151B35),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 600),
+              padding: const EdgeInsets.all(40),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF1E2749),
+                    Color(0xFF151B35),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.blue.withOpacity(0.2),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.1),
+                    blurRadius: 40,
+                    spreadRadius: 0,
+                    offset: const Offset(0, 10),
+                  ),
                 ],
               ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: Colors.blue.withOpacity(0.2),
-                width: 2,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildIcon(),
+                  const SizedBox(height: 24),
+                  _buildTitle(),
+                  const SizedBox(height: 12),
+                  _buildSubtitle(),
+                  const SizedBox(height: 32),
+                  _buildInputField(),
+                  const SizedBox(height: 24),
+                  _buildStartButton(),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.blue.withOpacity(0.1),
-                  blurRadius: 40,
-                  spreadRadius: 0,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildIcon(),
-                const SizedBox(height: 32),
-                _buildTitle(),
-                const SizedBox(height: 16),
-                _buildSubtitle(),
-                const SizedBox(height: 48),
-                _buildInputField(),
-                const SizedBox(height: 32),
-                _buildStartButton(),
-              ],
             ),
           ),
         ),
@@ -112,7 +114,7 @@ class _DeviceInputCardState extends State<DeviceInputCard>
 
   Widget _buildIcon() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
@@ -130,7 +132,7 @@ class _DeviceInputCardState extends State<DeviceInputCard>
       ),
       child: const Icon(
         Icons.bluetooth_searching,
-        size: 56,
+        size: 48,
         color: Colors.blue,
       ),
     );
@@ -141,7 +143,7 @@ class _DeviceInputCardState extends State<DeviceInputCard>
       'Device Configuration',
       style: TextStyle(
         color: Colors.white,
-        fontSize: 32,
+        fontSize: 28,
         fontWeight: FontWeight.bold,
         letterSpacing: 0.5,
       ),
@@ -154,7 +156,7 @@ class _DeviceInputCardState extends State<DeviceInputCard>
       'Enter the number of GMSync devices to test',
       style: TextStyle(
         color: Colors.white.withOpacity(0.6),
-        fontSize: 16,
+        fontSize: 14,
         letterSpacing: 0.3,
       ),
       textAlign: TextAlign.center,
@@ -193,7 +195,7 @@ class _DeviceInputCardState extends State<DeviceInputCard>
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 24,
-            vertical: 20,
+            vertical: 16,
           ),
         ),
         onSubmitted: (_) => _startTest(),
@@ -209,7 +211,7 @@ class _DeviceInputCardState extends State<DeviceInputCard>
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue,
           disabledBackgroundColor: Colors.blue.withOpacity(0.3),
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -224,15 +226,15 @@ class _DeviceInputCardState extends State<DeviceInputCard>
             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
           ),
         )
-            : Row(
+            : const Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            Icon(Icons.play_arrow, size: 28),
-            SizedBox(width: 12),
+          children: [
+            Icon(Icons.play_arrow, size: 24),
+            SizedBox(width: 8),
             Text(
               'Start Test',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
               ),

@@ -18,7 +18,9 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
   StreamSubscription? _scanSubscription;
   final Map<String, StreamSubscription> _dataSubscriptions = {};
+  final Map<String, List<ImuSample>> _collectedSamples = {};
   Timer? _testTimer;
+  Timer? _progressTimer;
   final QaConfig _config = const QaConfig();
 
   QaBloc({
@@ -38,14 +40,13 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     on<DeviceFoundEvent>(_onDeviceFound);
     on<ConnectDevicesEvent>(_onConnectDevices);
     on<StartTestEvent>(_onStartTest);
-    on<CollectSamplesEvent>(_onCollectSamples);
+    on<UpdateProgressEvent>(_onUpdateProgress);
     on<EvaluateResultsEvent>(_onEvaluateResults);
     on<ResetTestEvent>(_onReset);
     on<CancelTestEvent>(_onCancel);
   }
 
-  Future<void> _onInitialize(
-      InitializeQaEvent event, Emitter<QaState> emit) async {
+  Future<void> _onInitialize(InitializeQaEvent event, Emitter<QaState> emit) async {
     emit(state.copyWith(
       phase: QaTestPhase.initializing,
       statusMessage: 'Initializing BLE...',
@@ -65,8 +66,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     );
   }
 
-  Future<void> _onStartScanning(
-      StartScanningEvent event, Emitter<QaState> emit) async {
+  Future<void> _onStartScanning(StartScanningEvent event, Emitter<QaState> emit) async {
     emit(state.copyWith(
       phase: QaTestPhase.scanning,
       targetDeviceCount: event.targetDeviceCount,
@@ -79,11 +79,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     _scanSubscription = scanDevices().listen(
           (result) {
         result.fold(
-              (failure) => add(DeviceFoundEvent(
-            name: 'Error',
-            address: '',
-            rssi: 0,
-          )),
+              (failure) {},
               (device) => add(DeviceFoundEvent(
             name: device.name,
             address: device.address,
@@ -94,13 +90,11 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     );
   }
 
-  Future<void> _onDeviceFound(
-      DeviceFoundEvent event, Emitter<QaState> emit) async {
+  Future<void> _onDeviceFound(DeviceFoundEvent event, Emitter<QaState> emit) async {
     if (state.phase != QaTestPhase.scanning) return;
 
     final updatedDevices = List<BleDeviceInfo>.from(state.foundDevices);
-    final exists =
-    updatedDevices.any((device) => device.address == event.address);
+    final exists = updatedDevices.any((device) => device.address == event.address);
 
     if (!exists) {
       updatedDevices.add(BleDeviceInfo(
@@ -111,8 +105,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
       emit(state.copyWith(
         foundDevices: updatedDevices,
-        statusMessage:
-        'Found ${updatedDevices.length}/${state.targetDeviceCount} devices',
+        statusMessage: 'Found ${updatedDevices.length}/${state.targetDeviceCount} devices',
       ));
 
       if (updatedDevices.length >= state.targetDeviceCount) {
@@ -121,15 +114,13 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     }
   }
 
-  Future<void> _onStopScanning(
-      StopScanningEvent event, Emitter<QaState> emit) async {
+  Future<void> _onStopScanning(StopScanningEvent event, Emitter<QaState> emit) async {
     await stopScan();
     await _scanSubscription?.cancel();
     _scanSubscription = null;
   }
 
-  Future<void> _onConnectDevices(
-      ConnectDevicesEvent event, Emitter<QaState> emit) async {
+  Future<void> _onConnectDevices(ConnectDevicesEvent event, Emitter<QaState> emit) async {
     await stopScan();
     await _scanSubscription?.cancel();
 
@@ -177,77 +168,59 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     }
   }
 
-  Future<void> _onStartTest(
-      StartTestEvent event, Emitter<QaState> emit) async {
+  Future<void> _onStartTest(StartTestEvent event, Emitter<QaState> emit) async {
     emit(state.copyWith(
       phase: QaTestPhase.settling,
       statusMessage: 'Settling for ${_config.settleSeconds}s...',
       progress: 0.0,
     ));
 
-    for (final address in state.connectedDevices) {
-      _dataSubscriptions[address] = getDataStream(address).listen(
-            (sample) {},
-      );
-    }
-
     await Future.delayed(Duration(seconds: _config.settleSeconds.toInt()));
 
     emit(state.copyWith(
       phase: QaTestPhase.testing,
-      deviceSamples: {for (var addr in state.connectedDevices) addr: []},
       statusMessage: 'Collecting samples for ${_config.testSeconds}s...',
       progress: 0.0,
     ));
 
+    _collectedSamples.clear();
     for (final address in state.connectedDevices) {
+      _collectedSamples[address] = [];
+
       await _dataSubscriptions[address]?.cancel();
       _dataSubscriptions[address] = getDataStream(address).listen(
             (sample) {
-          add(CollectSamplesEvent());
+          _collectedSamples[address]?.add(sample);
         },
       );
     }
 
-    _testTimer = Timer.periodic(
+    _progressTimer?.cancel();
+    var elapsed = 0.0;
+    _progressTimer = Timer.periodic(
       const Duration(milliseconds: 100),
           (timer) {
-        if (state.phase == QaTestPhase.testing) {
-          final elapsed = timer.tick * 0.1;
-          final progress = elapsed / _config.testSeconds;
+        elapsed += 0.1;
+        final progress = elapsed / _config.testSeconds;
+        add(UpdateProgressEvent(progress));
 
-          if (progress >= 1.0) {
-            timer.cancel();
-            add(EvaluateResultsEvent());
-          }
+        if (progress >= 1.0) {
+          timer.cancel();
+          add(EvaluateResultsEvent());
         }
       },
     );
-
-    Future.delayed(Duration(seconds: _config.testSeconds.toInt()), () {
-      if (state.phase == QaTestPhase.testing) {
-        add(EvaluateResultsEvent());
-      }
-    });
   }
 
-  Future<void> _onCollectSamples(
-      CollectSamplesEvent event, Emitter<QaState> emit) async {
-    if (state.phase != QaTestPhase.testing) return;
-
-    final updatedSamples = Map<String, List<ImuSample>>.from(state.deviceSamples);
-
-    for (final address in state.connectedDevices) {
-      final subscription = _dataSubscriptions[address];
-      if (subscription != null) {
-        updatedSamples[address] = updatedSamples[address] ?? [];
-      }
+  Future<void> _onUpdateProgress(UpdateProgressEvent event, Emitter<QaState> emit) async {
+    if (state.phase == QaTestPhase.testing) {
+      emit(state.copyWith(progress: event.progress));
     }
   }
 
-  Future<void> _onEvaluateResults(
-      EvaluateResultsEvent event, Emitter<QaState> emit) async {
+  Future<void> _onEvaluateResults(EvaluateResultsEvent event, Emitter<QaState> emit) async {
     _testTimer?.cancel();
+    _progressTimer?.cancel();
 
     for (final subscription in _dataSubscriptions.values) {
       await subscription.cancel();
@@ -260,21 +233,9 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       progress: 1.0,
     ));
 
-    final Map<String, List<ImuSample>> finalSamples = {};
-
-    for (final address in state.connectedDevices) {
-      final samples = <ImuSample>[];
-
-      await for (final sample in getDataStream(address).take(1000)) {
-        samples.add(sample);
-      }
-
-      finalSamples[address] = samples;
-    }
-
     final results = <QaResult>[];
 
-    for (final entry in finalSamples.entries) {
+    for (final entry in _collectedSamples.entries) {
       final result = await evaluateDevice(entry.key, entry.value, _config);
       result.fold(
             (failure) {},
@@ -290,10 +251,12 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     emit(state.copyWith(
       phase: QaTestPhase.completed,
       results: results,
-      deviceSamples: finalSamples,
+      deviceSamples: Map.from(_collectedSamples),
       statusMessage: 'Test completed',
       progress: 1.0,
     ));
+
+    _collectedSamples.clear();
   }
 
   Future<void> _onReset(ResetTestEvent event, Emitter<QaState> emit) async {
@@ -311,6 +274,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
   Future<void> _cleanup() async {
     _testTimer?.cancel();
+    _progressTimer?.cancel();
     await _scanSubscription?.cancel();
 
     for (final subscription in _dataSubscriptions.values) {
@@ -324,6 +288,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     }
 
     await stopScan();
+    _collectedSamples.clear();
   }
 
   @override

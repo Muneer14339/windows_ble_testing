@@ -39,7 +39,14 @@ class ConnectDevicesEvent extends QaEvent {}
 
 class StartTestEvent extends QaEvent {}
 
-class CollectSamplesEvent extends QaEvent {}
+class UpdateProgressEvent extends QaEvent {
+  final double progress;
+
+  const UpdateProgressEvent(this.progress);
+
+  @override
+  List<Object?> get props => [progress];
+}
 
 class EvaluateResultsEvent extends QaEvent {}
 
