@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:typed_data';
+import 'package:injectable/injectable.dart';
 import 'package:win_ble/win_ble.dart';
 import 'package:win_ble/win_file.dart';
 import '../../../../core/entities/imu_entities.dart';
@@ -18,12 +20,12 @@ class BleDataSourceImpl implements BleDataSource {
   final Map<String, StreamController<ImuSample>> _deviceStreams = {};
   final Map<String, StreamSubscription> _connectionSubscriptions = {};
   StreamSubscription? _scanSubscription;
+  StreamController<BleDeviceInfo>? _scanController;
   bool _isInitialized = false;
 
   @override
   Future<void> initialize() async {
     if (_isInitialized) return;
-
     await WinBle.initialize(
       serverPath: await WinServer.path(),
       enableLog: false,
@@ -32,27 +34,50 @@ class BleDataSourceImpl implements BleDataSource {
   }
 
   @override
-  Stream<BleDeviceInfo> scanForDevices() async* {
-    final controller = StreamController<BleDeviceInfo>();
+  Stream<BleDeviceInfo> scanForDevices() {
+    _scanController?.close();
+    _scanController = StreamController<BleDeviceInfo>.broadcast();
+
     final seenAddresses = <String>{};
+    final Map<String, DateTime> pendingDevices = {};
+
+    Timer.periodic(const Duration(milliseconds: 200), (timer) {
+      if (_scanController == null || _scanController!.isClosed) {
+        timer.cancel();
+        return;
+      }
+
+      final now = DateTime.now();
+      final toCheck = <String>[];
+
+      pendingDevices.forEach((address, time) {
+        if (now.difference(time).inMilliseconds >= 150) {
+          toCheck.add(address);
+        }
+      });
+
+      for (final address in toCheck) {
+        pendingDevices.remove(address);
+      }
+    });
 
     _scanSubscription = WinBle.scanStream.listen((device) {
+      if (device.advType != "ScanResponse") return;
       final name = device.name.trim();
       if (name.isEmpty || name == "N/A") return;
       if (!name.startsWith("GMSync")) return;
       if (seenAddresses.contains(device.address)) return;
 
       seenAddresses.add(device.address);
-      controller.add(BleDeviceInfo(
+      _scanController?.add(BleDeviceInfo(
         name: name,
         address: device.address,
-        rssi: device.rssi,
+        rssi: int.parse(device.rssi) ?? -100,
       ));
     });
 
     WinBle.startScanning();
-
-    yield* controller.stream;
+    return _scanController!.stream;
   }
 
   @override
@@ -60,6 +85,8 @@ class BleDataSourceImpl implements BleDataSource {
     WinBle.stopScanning();
     await _scanSubscription?.cancel();
     _scanSubscription = null;
+    await _scanController?.close();
+    _scanController = null;
   }
 
   @override
@@ -82,9 +109,7 @@ class BleDataSourceImpl implements BleDataSource {
       _connectionSubscriptions.remove(address);
       await _deviceStreams[address]?.close();
       _deviceStreams.remove(address);
-    } catch (e) {
-      // Silent fail
-    }
+    } catch (e) {}
   }
 
   @override
@@ -102,33 +127,30 @@ class BleDataSourceImpl implements BleDataSource {
     await WinBle.discoverServices(address);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    final subscription = WinBle.subscribeToCharacteristic(
+    WinBle.subscribeToCharacteristic(
       address: address,
       serviceId: serviceUuid,
       characteristicId: notifyUuid,
     );
 
-    _connectionSubscriptions[address] = subscription.listen((data) {
-      final sample = _parseImuData(data);
-      if (sample != null && !(_deviceStreams[address]?.isClosed ?? true)) {
-        _deviceStreams[address]!.add(sample);
+    _connectionSubscriptions[address] = WinBle.characteristicValueStream.listen((event) {
+      if (event.address == address && event.characteristicId == notifyUuid) {
+        final sample = _parseImuData(event.value);
+        if (sample != null && !(_deviceStreams[address]?.isClosed ?? true)) {
+          _deviceStreams[address]!.add(sample);
+        }
       }
     });
 
     await Future.delayed(const Duration(milliseconds: 200));
-
     await _writeCommand(address, writeUuid, [0x55, 0xAA, 0xF0, 0x00]);
     await Future.delayed(const Duration(milliseconds: 200));
-
     await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x11, 0x02, 0x00, 0x02]);
     await Future.delayed(const Duration(milliseconds: 200));
-
     await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x0A, 0x00]);
     await Future.delayed(const Duration(milliseconds: 200));
-
     await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x08, 0x00]);
     await Future.delayed(const Duration(milliseconds: 200));
-
     await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x06, 0x00]);
   }
 
@@ -140,9 +162,7 @@ class BleDataSourceImpl implements BleDataSource {
     try {
       await _writeCommand(address, writeUuid, [0x55, 0xAA, 0xF0, 0x00]);
       await _stopNotifications(address);
-    } catch (e) {
-      // Silent fail
-    }
+    } catch (e) {}
   }
 
   Future<void> _stopNotifications(String address) async {
@@ -155,20 +175,16 @@ class BleDataSourceImpl implements BleDataSource {
         serviceId: serviceUuid,
         characteristicId: notifyUuid,
       );
-    } catch (e) {
-      // Silent fail
-    }
+    } catch (e) {}
   }
 
-  Future<void> _writeCommand(
-      String address, String characteristicId, List<int> data) async {
+  Future<void> _writeCommand(String address, String characteristicId, List<int> data) async {
     const serviceUuid = "0000b3a0-0000-1000-8000-00805f9b34fb";
-
     await WinBle.write(
       address: address,
       service: serviceUuid,
       characteristic: characteristicId,
-      data: data,
+      data: Uint8List.fromList(data),
       writeWithResponse: true,
     );
   }
