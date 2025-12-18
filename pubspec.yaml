@@ -40,6 +40,7 @@ dependencies:
 
   # BLE
   win_ble: ^1.1.1
+  flutter_blue_plus_windows: ^1.26.1
 
   # Dependency Injection
   get_it: ^9.2.0
