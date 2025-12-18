@@ -126,30 +126,16 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
     emit(state.copyWith(
       phase: QaTestPhase.connecting,
-      statusMessage: 'Connecting to devices...',
+      statusMessage: 'Connecting to ${state.foundDevices.length} devices in parallel...',
     ));
 
-    final connected = <String>[];
+    // Parallel connection with individual retry logic for each device
+    final connectionTasks = state.foundDevices.map((device) {
+      return _connectDeviceWithRetry(device.address, device.name, emit);
+    }).toList();
 
-    for (final device in state.foundDevices) {
-      emit(state.copyWith(
-        statusMessage: 'Connecting to ${device.name}...',
-      ));
-
-      final result = await connectDevice(device.address);
-      await result.fold(
-            (failure) async {},
-            (_) async {
-          final startResult = await startSensors(device.address);
-          await startResult.fold(
-                (failure) async {},
-                (_) async {
-              connected.add(device.address);
-            },
-          );
-        },
-      );
-    }
+    final results = await Future.wait(connectionTasks);
+    final connected = results.where((addr) => addr != null).map((addr) => addr!).toList();
 
     if (connected.isEmpty) {
       emit(state.copyWith(
@@ -158,14 +144,60 @@ class QaBloc extends Bloc<QaEvent, QaState> {
         statusMessage: 'Connection failed',
       ));
     } else {
+      final successCount = connected.length;
+      final totalCount = state.foundDevices.length;
+
       emit(state.copyWith(
         phase: QaTestPhase.settling,
         connectedDevices: connected,
-        statusMessage: 'Connected ${connected.length} device(s)',
+        statusMessage: 'Connected $successCount/$totalCount device(s). ${totalCount - successCount > 0 ? "Retrying failed connections..." : ""}',
       ));
 
       add(StartTestEvent());
     }
+  }
+
+  Future<String?> _connectDeviceWithRetry(
+      String address,
+      String name,
+      Emitter<QaState> emit,
+      ) async {
+    const maxRetries = 3;
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        final result = await connectDevice(address);
+
+        final success = await result.fold(
+              (failure) async => false,
+              (_) async {
+            // Small delay after connection
+            await Future.delayed(const Duration(milliseconds: 300));
+
+            // Try to start sensors
+            final startResult = await startSensors(address);
+            return await startResult.fold(
+                  (failure) async => false,
+                  (_) async => true,
+            );
+          },
+        );
+
+        if (success) return address;
+
+        // Exponential backoff for retry
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
+        }
+      } catch (e) {
+        if (attempt == maxRetries) {
+          return null;
+        }
+        await Future.delayed(Duration(milliseconds: 500 * attempt));
+      }
+    }
+
+    return null;
   }
 
   Future<void> _onStartTest(StartTestEvent event, Emitter<QaState> emit) async {
@@ -179,11 +211,14 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
     emit(state.copyWith(
       phase: QaTestPhase.testing,
-      statusMessage: 'Collecting samples for ${_config.testSeconds}s...',
+      statusMessage: 'Collecting samples from ${state.connectedDevices.length} device(s)...',
       progress: 0.0,
     ));
 
+    // Clear previous data
     _collectedSamples.clear();
+
+    // Setup data collection for ALL connected devices in parallel
     for (final address in state.connectedDevices) {
       _collectedSamples[address] = [];
 
@@ -191,6 +226,9 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       _dataSubscriptions[address] = getDataStream(address).listen(
             (sample) {
           _collectedSamples[address]?.add(sample);
+        },
+        onError: (error) {
+          // Continue collecting from other devices even if one fails
         },
       );
     }
@@ -214,7 +252,17 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
   Future<void> _onUpdateProgress(UpdateProgressEvent event, Emitter<QaState> emit) async {
     if (state.phase == QaTestPhase.testing) {
-      emit(state.copyWith(progress: event.progress));
+      // Get current sample counts for all devices
+      final counts = <String, int>{};
+      for (final address in state.connectedDevices) {
+        counts[address] = _collectedSamples[address]?.length ?? 0;
+      }
+
+      emit(state.copyWith(
+        progress: event.progress,
+        sampleCounts: counts,
+        statusMessage: 'Collecting... ${(event.progress * 100).toInt()}%',
+      ));
     }
   }
 
@@ -222,6 +270,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     _testTimer?.cancel();
     _progressTimer?.cancel();
 
+    // Cancel all data subscriptions
     for (final subscription in _dataSubscriptions.values) {
       await subscription.cancel();
     }
@@ -229,12 +278,13 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
     emit(state.copyWith(
       phase: QaTestPhase.evaluating,
-      statusMessage: 'Evaluating results...',
+      statusMessage: 'Evaluating results from ${state.connectedDevices.length} device(s)...',
       progress: 1.0,
     ));
 
     final results = <QaResult>[];
 
+    // Evaluate each device
     for (final entry in _collectedSamples.entries) {
       final result = await evaluateDevice(entry.key, entry.value, _config);
       result.fold(
@@ -243,6 +293,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       );
     }
 
+    // Stop sensors and disconnect
     for (final address in state.connectedDevices) {
       await stopSensors(address);
       await disconnectDevice(address);
@@ -252,7 +303,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       phase: QaTestPhase.completed,
       results: results,
       deviceSamples: Map.from(_collectedSamples),
-      statusMessage: 'Test completed',
+      statusMessage: 'Test completed - ${results.length} device(s) evaluated',
       progress: 1.0,
     ));
 

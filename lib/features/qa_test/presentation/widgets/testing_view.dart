@@ -7,6 +7,7 @@ class TestingView extends StatelessWidget {
   final String statusMessage;
   final double progress;
   final int connectedDeviceCount;
+  final Map<String, int>? deviceSampleCounts;
 
   const TestingView({
     super.key,
@@ -14,6 +15,7 @@ class TestingView extends StatelessWidget {
     required this.statusMessage,
     required this.progress,
     required this.connectedDeviceCount,
+    this.deviceSampleCounts,
   });
 
   @override
@@ -35,6 +37,10 @@ class TestingView extends StatelessWidget {
               _buildStatus(),
               const SizedBox(height: 24),
               _buildDeviceCount(),
+              if (phase == QaTestPhase.testing && deviceSampleCounts != null) ...[
+                const SizedBox(height: 16),
+                _buildSampleCounts(),
+              ],
               const SizedBox(height: 24),
               if (phase == QaTestPhase.testing) _buildProgressBar(),
               if (phase == QaTestPhase.settling || phase == QaTestPhase.evaluating)
@@ -139,6 +145,68 @@ class TestingView extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSampleCounts() {
+    if (deviceSampleCounts == null || deviceSampleCounts!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.whiteWithOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.blueWithOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Sample Counts',
+            style: TextStyle(
+              color: AppColors.whiteWithOpacity(0.7),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...deviceSampleCounts!.entries.map((entry) {
+            final shortAddr = entry.key.length > 17
+                ? entry.key.substring(entry.key.length - 8)
+                : entry.key;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '$shortAddr: ',
+                    style: TextStyle(
+                      color: AppColors.whiteWithOpacity(0.5),
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                  Text(
+                    '${entry.value}',
+                    style: TextStyle(
+                      color: entry.value > 0 ? AppColors.green : AppColors.red,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
         ],
       ),
     );

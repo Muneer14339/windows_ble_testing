@@ -17,7 +17,7 @@ abstract class BleDataSource {
 
 class BleDataSourceImpl implements BleDataSource {
   final Map<String, StreamController<ImuSample>> _deviceStreams = {};
-  final Map<String, StreamSubscription> _notifySubscriptions = {};
+  StreamSubscription? _globalNotifySubscription;
   StreamSubscription? _scanSubscription;
   StreamController<BleDeviceInfo>? _scanController;
   bool _isInitialized = false;
@@ -29,6 +29,37 @@ class BleDataSourceImpl implements BleDataSource {
       serverPath: await WinServer.path(),
       enableLog: false,
     );
+
+    // Setup SINGLE global subscription for ALL devices
+    _globalNotifySubscription = WinBle.characteristicValueStream.listen((data) {
+      try {
+        String? eventAddress;
+        String? eventCharId;
+        List<int>? eventValue;
+
+        if (data is Map) {
+          eventAddress = data['address']?.toString();
+          eventCharId = data['characteristicId']?.toString();
+          final rawValue = data['value'];
+          if (rawValue is List) {
+            eventValue = rawValue.cast<int>();
+          }
+        }
+
+        const notifyUuid = "0000b3a1-0000-1000-8000-00805f9b34fb";
+
+        if (eventAddress != null && eventCharId == notifyUuid && eventValue != null) {
+          final sample = _parseImuData(eventValue);
+          if (sample != null) {
+            final controller = _deviceStreams[eventAddress];
+            if (controller != null && !controller.isClosed) {
+              controller.add(sample);
+            }
+          }
+        }
+      } catch (e) {}
+    });
+
     _isInitialized = true;
   }
 
@@ -83,8 +114,6 @@ class BleDataSourceImpl implements BleDataSource {
     try {
       await _stopNotifications(address);
       await WinBle.disconnect(address);
-      await _notifySubscriptions[address]?.cancel();
-      _notifySubscriptions.remove(address);
       await _deviceStreams[address]?.close();
       _deviceStreams.remove(address);
     } catch (e) {}
@@ -92,7 +121,9 @@ class BleDataSourceImpl implements BleDataSource {
 
   @override
   Stream<ImuSample> getDataStream(String address) {
-    _deviceStreams[address] ??= StreamController<ImuSample>.broadcast();
+    if (!_deviceStreams.containsKey(address)) {
+      _deviceStreams[address] = StreamController<ImuSample>.broadcast();
+    }
     return _deviceStreams[address]!.stream;
   }
 
@@ -106,35 +137,10 @@ class BleDataSourceImpl implements BleDataSource {
       await WinBle.discoverServices(address);
       await Future.delayed(const Duration(milliseconds: 500));
 
-      _deviceStreams[address] ??= StreamController<ImuSample>.broadcast();
+      // Create stream controller for this device
+      _deviceStreams[address] = StreamController<ImuSample>.broadcast();
 
-      await _notifySubscriptions[address]?.cancel();
-      _notifySubscriptions[address] = WinBle.characteristicValueStream.listen((data) {
-        try {
-          String? eventAddress;
-          String? eventCharId;
-          List<int>? eventValue;
-
-          if (data is Map) {
-            eventAddress = data['address']?.toString();
-            eventCharId = data['characteristicId']?.toString();
-            final rawValue = data['value'];
-            if (rawValue is List) {
-              eventValue = rawValue.cast<int>();
-            }
-          }
-
-          if (eventAddress == address && eventCharId == notifyUuid && eventValue != null) {
-            final sample = _parseImuData(eventValue);
-            if (sample != null && !(_deviceStreams[address]?.isClosed ?? true)) {
-              _deviceStreams[address]!.add(sample);
-            }
-          }
-        } catch (e) {}
-      });
-
-      await Future.delayed(const Duration(milliseconds: 200));
-
+      // Subscribe to notifications
       WinBle.subscribeToCharacteristic(
         address: address,
         serviceId: serviceUuid,
@@ -142,6 +148,8 @@ class BleDataSourceImpl implements BleDataSource {
       );
 
       await Future.delayed(const Duration(milliseconds: 300));
+
+      // Send start commands
       await _writeCommand(address, writeUuid, [0x55, 0xAA, 0xF0, 0x00]);
       await Future.delayed(const Duration(milliseconds: 200));
       await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x11, 0x02, 0x00, 0x02]);
@@ -235,5 +243,13 @@ class BleDataSourceImpl implements BleDataSource {
   int _be16(List<int> data, int offset) {
     final value = (data[offset] << 8) | data[offset + 1];
     return value > 32767 ? value - 65536 : value;
+  }
+
+  void dispose() {
+    _globalNotifySubscription?.cancel();
+    for (var controller in _deviceStreams.values) {
+      controller.close();
+    }
+    _deviceStreams.clear();
   }
 }

@@ -180,6 +180,7 @@ class _QaTestPageState extends State<QaTestPage> {
           statusMessage: state.statusMessage,
           progress: state.progress,
           connectedDeviceCount: state.connectedDevices.length,
+          deviceSampleCounts: state.sampleCounts.isNotEmpty ? state.sampleCounts : null,
         );
       case QaTestPhase.completed:
         return ResultsView(results: state.results);

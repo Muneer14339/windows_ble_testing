@@ -19,6 +19,7 @@ class QaState extends Equatable {
   final List<BleDeviceInfo> foundDevices;
   final List<String> connectedDevices;
   final Map<String, List<ImuSample>> deviceSamples;
+  final Map<String, int> sampleCounts;
   final List<QaResult> results;
   final String? errorMessage;
   final double progress;
@@ -30,6 +31,7 @@ class QaState extends Equatable {
     this.foundDevices = const [],
     this.connectedDevices = const [],
     this.deviceSamples = const {},
+    this.sampleCounts = const {},
     this.results = const [],
     this.errorMessage,
     this.progress = 0.0,
@@ -49,6 +51,7 @@ class QaState extends Equatable {
     List<BleDeviceInfo>? foundDevices,
     List<String>? connectedDevices,
     Map<String, List<ImuSample>>? deviceSamples,
+    Map<String, int>? sampleCounts,
     List<QaResult>? results,
     String? errorMessage,
     double? progress,
@@ -60,6 +63,7 @@ class QaState extends Equatable {
       foundDevices: foundDevices ?? this.foundDevices,
       connectedDevices: connectedDevices ?? this.connectedDevices,
       deviceSamples: deviceSamples ?? this.deviceSamples,
+      sampleCounts: sampleCounts ?? this.sampleCounts,
       results: results ?? this.results,
       errorMessage: errorMessage,
       progress: progress ?? this.progress,
@@ -74,6 +78,7 @@ class QaState extends Equatable {
     foundDevices,
     connectedDevices,
     deviceSamples,
+    sampleCounts,
     results,
     errorMessage,
     progress,
