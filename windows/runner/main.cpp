@@ -4,6 +4,7 @@
 
 #include "flutter_window.h"
 #include "utils.h"
+#include "../plugins/ble_plugin/ble_plugin.h"
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
@@ -28,9 +29,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
   if (!window.Create(L"flutter_windows_ble", origin, size)) {
-    return EXIT_FAILURE;
+   return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
+
+// Register BLE Plugin
+// Register BLE Plugin
+auto registrar_ref = window.GetRegistrar()->engine()->GetRegistrarForPlugin("BlePlugin");
+auto registrar = std::make_unique<flutter::PluginRegistrarWindows>(registrar_ref);
+BlePlugin::RegisterWithRegistrar(registrar.get());
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
