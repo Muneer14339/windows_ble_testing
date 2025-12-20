@@ -215,7 +215,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
     _collectedSamples.clear();
 
-    for (final address in state.connectedDevices) {
+    for (int i = 0; i < state.connectedDevices.length; i++) {
+      final address = state.connectedDevices[i];
       _collectedSamples[address] = [];
       await _dataSubscriptions[address]?.cancel();
       _dataSubscriptions[address] = getDataStream(address).listen(
@@ -223,6 +224,11 @@ class QaBloc extends Bloc<QaEvent, QaState> {
           _collectedSamples[address]?.add(sample);
         },
       );
+
+      // Add delay between starting each device's data stream
+      if (i < state.connectedDevices.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
     }
 
     _progressTimer?.cancel();

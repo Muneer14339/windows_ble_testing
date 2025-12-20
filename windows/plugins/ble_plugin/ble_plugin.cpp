@@ -202,13 +202,18 @@ void BlePlugin::ConnectDevice(const std::string& address, std::unique_ptr<flutte
 void BlePlugin::StartSensors(const std::string& address, std::unique_ptr<flutter::MethodResult<>>& result) {
     auto result_ptr = result.release();
 
-    std::thread([this, address, result_ptr]() {
+    // Create isolated copy of address for this device session
+    auto device_address = std::make_shared<std::string>(address);
+
+    std::thread([this, device_address, result_ptr]() {
         try {
+            const std::string& addr = *device_address;
+
             GattCharacteristic notify_char{nullptr};
             GattCharacteristic write_char{nullptr};
             {
                 std::lock_guard<std::mutex> lock(devices_mutex_);
-                auto it = devices_.find(address);
+                auto it = devices_.find(addr);
                 if (it == devices_.end()) {
                     result_ptr->Error("NOT_CONNECTED", "Device not connected");
                     delete result_ptr;
@@ -218,51 +223,52 @@ void BlePlugin::StartSensors(const std::string& address, std::unique_ptr<flutter
                 write_char = it->second.write_char;
             }
 
-            auto token = notify_char.ValueChanged([this, address](
-                    GattCharacteristic const&, GattValueChangedEventArgs args) {
-                try {
-                    auto reader = DataReader::FromBuffer(args.CharacteristicValue());
-                    uint32_t length = reader.UnconsumedBufferLength();
-                    if (length == 0) return;
+            // CRITICAL: Each device gets its own handler with isolated address
+            auto token = notify_char.ValueChanged(
+                    [this, device_address](GattCharacteristic const&, GattValueChangedEventArgs args) {
+                        const std::string& addr = *device_address;
+                        try {
+                            auto reader = DataReader::FromBuffer(args.CharacteristicValue());
+                            uint32_t length = reader.UnconsumedBufferLength();
+                            if (length == 0) return;
 
-                    std::vector<uint8_t> data(length);
-                    reader.ReadBytes(data);
+                            std::vector<uint8_t> data(length);
+                            reader.ReadBytes(data);
 
-                    if (data.size() < 10 || data[0] != 0x55 || data[1] != 0xAA || data[3] != 0x06) return;
+                            if (data.size() < 10 || data[0] != 0x55 || data[1] != 0xAA || data[3] != 0x06) return;
 
-                    uint8_t cmd = data[2];
-                    int16_t rx = ParseBE16(&data[4]);
-                    int16_t ry = ParseBE16(&data[6]);
-                    int16_t rz = ParseBE16(&data[8]);
+                            uint8_t cmd = data[2];
+                            int16_t rx = ParseBE16(&data[4]);
+                            int16_t ry = ParseBE16(&data[6]);
+                            int16_t rz = ParseBE16(&data[8]);
 
-                    double timestamp = std::chrono::duration<double>(
-                            std::chrono::steady_clock::now().time_since_epoch()).count();
+                            double timestamp = std::chrono::duration<double>(
+                                    std::chrono::steady_clock::now().time_since_epoch()).count();
 
-                    std::map<std::string, double> sample;
-                    sample["timestampS"] = timestamp;
-                    sample["temp"] = 0.0;
+                            std::map<std::string, double> sample;
+                            sample["timestampS"] = timestamp;
+                            sample["temp"] = 0.0;
 
-                    if (cmd == 0x08) {
-                        sample["ax"] = 16.0 * rx / 32768.0;
-                        sample["ay"] = 16.0 * ry / 32768.0;
-                        sample["az"] = 16.0 * rz / 32768.0;
-                        sample["gx"] = 0.0;
-                        sample["gy"] = 0.0;
-                        sample["gz"] = 0.0;
-                    } else if (cmd == 0x0A) {
-                        sample["ax"] = 0.0;
-                        sample["ay"] = 0.0;
-                        sample["az"] = 0.0;
-                        sample["gx"] = 500.0 * rx / 28571.0;
-                        sample["gy"] = 500.0 * ry / 28571.0;
-                        sample["gz"] = 500.0 * rz / 28571.0;
+                            if (cmd == 0x08) {
+                                sample["ax"] = 16.0 * rx / 32768.0;
+                                sample["ay"] = 16.0 * ry / 32768.0;
+                                sample["az"] = 16.0 * rz / 32768.0;
+                                sample["gx"] = 0.0;
+                                sample["gy"] = 0.0;
+                                sample["gz"] = 0.0;
+                            } else if (cmd == 0x0A) {
+                                sample["ax"] = 0.0;
+                                sample["ay"] = 0.0;
+                                sample["az"] = 0.0;
+                                sample["gx"] = 500.0 * rx / 28571.0;
+                                sample["gy"] = 500.0 * ry / 28571.0;
+                                sample["gz"] = 500.0 * rz / 28571.0;
+                            }
+
+                            this->SendDataSample(addr, sample);
+                        } catch (...) {}
                     }
-// Debug: Check if data is being collected
-                    static std::map<std::string, int> counters;
-                    counters[address]++;
-                    this->SendDataSample(address, sample);
-                } catch (...) {}
-            });
+            );
 
             notify_char.WriteClientCharacteristicConfigurationDescriptorAsync(
                     GattClientCharacteristicConfigurationDescriptorValue::Notify).get();
@@ -290,7 +296,7 @@ void BlePlugin::StartSensors(const std::string& address, std::unique_ptr<flutter
 
             {
                 std::lock_guard<std::mutex> lock(devices_mutex_);
-                auto it = devices_.find(address);
+                auto it = devices_.find(addr);
                 if (it != devices_.end()) {
                     it->second.value_changed_token = token;
                 }
@@ -358,10 +364,17 @@ void BlePlugin::SendDataSample(const std::string& address, const std::map<std::s
         sample_map[flutter::EncodableValue(key)] = flutter::EncodableValue(value);
     }
 
-    std::lock_guard<std::mutex> lock(samples_mutex_);
-    pending_samples_[address].push_back(sample_map);
-}
+    {
+        std::lock_guard<std::mutex> lock(samples_mutex_);
 
+        // Ensure buffer exists for this device
+        if (pending_samples_.find(address) == pending_samples_.end()) {
+            pending_samples_[address] = std::vector<flutter::EncodableMap>();
+        }
+
+        pending_samples_[address].push_back(sample_map);
+    }
+}
 flutter::EncodableValue BlePlugin::PollDevices() {
     std::lock_guard<std::mutex> lock(scan_mutex_);
     flutter::EncodableList result;
