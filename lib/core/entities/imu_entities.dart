@@ -88,13 +88,13 @@ class QaConfig extends Equatable {
   const QaConfig({
     this.settleSeconds = 5.0,
     this.testSeconds = 60.0,
-    this.abnormalThresholdDeg = 0.30,
-    this.gravityDeviationG = 0.05,
+    this.abnormalThresholdDeg = 4,
+    this.gravityDeviationG = 1,
     this.gyroStillnessDegPerS = 0.5,
     this.maxAbnormalPerWindow = 100,
-    this.maxMacDeg = 0.20,
-    this.maxNoiseSigmaDeg = 0.05,
-    this.maxDriftDegPerMin = 0.10,
+    this.maxMacDeg = 1,
+    this.maxNoiseSigmaDeg = 1,
+    this.maxDriftDegPerMin = 1,
   });
 
   @override

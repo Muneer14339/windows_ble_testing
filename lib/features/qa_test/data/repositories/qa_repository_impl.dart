@@ -183,6 +183,7 @@ class QaRepositoryImpl implements QaRepository {
       int abnormalCount = 0;
       for (final s in gyroSamples) {
         final mag = sqrt(s.gx * s.gx + s.gy * s.gy + s.gz * s.gz);
+        print("Magnitude : $mag");
         if (mag > config.abnormalThresholdDeg) {
           abnormalCount++;
         }
