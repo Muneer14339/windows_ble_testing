@@ -64,6 +64,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
         statusMessage: 'Ready to start',
       )),
     );
+    // Automatically start scanning for 1 device
+    add(const StartScanningEvent(1));
   }
 
   Future<void> _onStartScanning(StartScanningEvent event, Emitter<QaState> emit) async {
@@ -299,15 +301,48 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
   Future<void> _onReset(ResetTestEvent event, Emitter<QaState> emit) async {
     await _cleanup();
-    emit(QaState.initial());
+    // emit(QaState.initial());
+    // Instead of going to idle, directly start scanning
+    emit(state.copyWith(
+      phase: QaTestPhase.initializing,
+      statusMessage: 'Initializing...',
+      targetDeviceCount: 0,
+      foundDevices: [],
+      connectedDevices: [],
+      results: [],
+      deviceSamples: {},
+      sampleCounts: {},
+      errorMessage: null,
+      progress: 0.0,
+    ));
+
+    // Reinitialize and start scanning
+    add(InitializeQaEvent());
   }
 
   Future<void> _onCancel(CancelTestEvent event, Emitter<QaState> emit) async {
     await _cleanup();
+    // emit(state.copyWith(
+    //   phase: QaTestPhase.idle,
+    //   statusMessage: 'Test cancelled',
+    // ));
+
+    // Instead of going to idle, directly start scanning again
     emit(state.copyWith(
-      phase: QaTestPhase.idle,
-      statusMessage: 'Test cancelled',
+      phase: QaTestPhase.initializing,
+      statusMessage: 'Restarting...',
+      targetDeviceCount: 0,
+      foundDevices: [],
+      connectedDevices: [],
+      results: [],
+      deviceSamples: {},
+      sampleCounts: {},
+      errorMessage: null,
+      progress: 0.0,
     ));
+
+    // Reinitialize and start scanning
+    add(InitializeQaEvent());
   }
 
   Future<void> _cleanup() async {

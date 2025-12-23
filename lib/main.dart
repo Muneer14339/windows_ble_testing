@@ -28,6 +28,21 @@ class MyApp extends StatelessWidget {
           surface: const Color(0xFF151B35),
         ),
         scaffoldBackgroundColor: const Color(0xFF0A0E27),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Colors.white, // Button text color
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white, // Button text color
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white, // Button text color
+          ),
+        ),
       ),
       home: BlocProvider(
         create: (_) => di.sl<QaBloc>(),
