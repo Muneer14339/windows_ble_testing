@@ -93,3 +93,13 @@ class EvaluateDevice {
     return repository.evaluateDevice(deviceId, samples, config);
   }
 }
+
+class ExportToExcel {
+  final QaRepository repository;
+
+  ExportToExcel(this.repository);
+
+  Future<Either<Failure, String>> call(List<QaResult> results) {
+    return repository.exportToExcel(results);
+  }
+}

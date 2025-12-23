@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 import 'features/qa_test/data/datasources/ble_datasource.dart';
+import 'features/qa_test/data/datasources/excel_datasource.dart'; // NEW
 import 'features/qa_test/data/repositories/qa_repository_impl.dart';
 import 'features/qa_test/domain/repository/qa_repository.dart';
 import 'features/qa_test/domain/usecases/qa_usecases.dart';
@@ -19,6 +20,7 @@ Future<void> init() async {
       getDataStream: sl(),
       evaluateDevice: sl(),
       disconnectDevice: sl(),
+      exportToExcel: sl(), // NEW
     ),
   );
 
@@ -31,12 +33,17 @@ Future<void> init() async {
   sl.registerLazySingleton(() => StopSensors(sl()));
   sl.registerLazySingleton(() => GetDataStream(sl()));
   sl.registerLazySingleton(() => EvaluateDevice(sl()));
+  sl.registerLazySingleton(() => ExportToExcel(sl())); // NEW
 
   sl.registerLazySingleton<QaRepository>(
-        () => QaRepositoryImpl(sl()),
+        () => QaRepositoryImpl(sl(), sl()), // UPDATED
   );
 
   sl.registerLazySingleton<BleDataSource>(
         () => BleDataSourceImpl(),
+  );
+
+  sl.registerLazySingleton<ExcelDataSource>( // NEW
+        () => ExcelDataSourceImpl(),
   );
 }

@@ -13,4 +13,5 @@ abstract class QaRepository {
   Stream<ImuSample> getDataStream(String address);
   Future<Either<Failure, QaResult>> evaluateDevice(
       String deviceId, List<ImuSample> samples, QaConfig config);
+  Future<Either<Failure, String>> exportToExcel(List<QaResult> results); // NEW
 }

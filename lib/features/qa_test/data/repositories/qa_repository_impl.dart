@@ -4,11 +4,13 @@ import '../../../../core/entities/imu_entities.dart';
 import '../../../../core/errors/failures.dart';
 import '../../domain/repository/qa_repository.dart';
 import '../datasources/ble_datasource.dart';
+import '../datasources/excel_datasource.dart';
 
 class QaRepositoryImpl implements QaRepository {
   final BleDataSource dataSource;
+  final ExcelDataSource excelDataSource;
 
-  QaRepositoryImpl(this.dataSource);
+  QaRepositoryImpl(this.dataSource, this.excelDataSource);
 
   @override
   Future<Either<Failure, void>> initialize() async {
@@ -220,6 +222,16 @@ class QaRepositoryImpl implements QaRepository {
       ));
     } catch (e) {
       return Left(TestFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, String>> exportToExcel(List<QaResult> results) async {
+    try {
+      final filePath = await excelDataSource.exportResults(results);
+      return Right(filePath);
+    } catch (e) {
+      return Left(TestFailure('Export failed: ${e.toString()}'));
     }
   }
 }

@@ -16,6 +16,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
   final GetDataStream getDataStream;
   final EvaluateDevice evaluateDevice;
   final DisconnectDevice disconnectDevice;
+  final ExportToExcel exportToExcel; // NEW
 
   StreamSubscription? _scanSubscription;
   final Map<String, StreamSubscription> _dataSubscriptions = {};
@@ -33,6 +34,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     required this.getDataStream,
     required this.evaluateDevice,
     required this.disconnectDevice,
+    required this.exportToExcel,
   }) : super(QaState.initial()) {
     on<InitializeQaEvent>(_onInitialize);
     on<StartScanningEvent>(_onStartScanning);
@@ -288,11 +290,23 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       await disconnectDevice(address);
     }
 
+    // Export to Excel - NEW
+    String? exportPath;
+    if (results.isNotEmpty) {
+      final exportResult = await exportToExcel(results);
+      exportResult.fold(
+            (failure) => exportPath = null,
+            (path) => exportPath = path,
+      );
+    }
+
     emit(state.copyWith(
       phase: QaTestPhase.completed,
       results: results,
       deviceSamples: Map.from(_collectedSamples),
-      statusMessage: 'Test completed - ${results.length} device(s) evaluated',
+      statusMessage: exportPath != null
+          ? 'Test completed - Data saved to Excel'
+          : 'Test completed - ${results.length} device(s) evaluated',
       progress: 1.0,
     ));
 
