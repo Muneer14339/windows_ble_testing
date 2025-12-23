@@ -6,6 +6,7 @@ enum QaTestPhase {
   initializing,
   scanning,
   connecting,
+  shaking,  // NEW
   settling,
   testing,
   evaluating,
@@ -24,6 +25,7 @@ class QaState extends Equatable {
   final String? errorMessage;
   final double progress;
   final String statusMessage;
+  final bool isShaking;  // NEW
 
   const QaState({
     required this.phase,
@@ -36,6 +38,7 @@ class QaState extends Equatable {
     this.errorMessage,
     this.progress = 0.0,
     this.statusMessage = '',
+    this.isShaking = false,  // NEW
   });
 
   factory QaState.initial() {
@@ -56,6 +59,7 @@ class QaState extends Equatable {
     String? errorMessage,
     double? progress,
     String? statusMessage,
+    bool? isShaking,  // NEW
   }) {
     return QaState(
       phase: phase ?? this.phase,
@@ -68,6 +72,7 @@ class QaState extends Equatable {
       errorMessage: errorMessage,
       progress: progress ?? this.progress,
       statusMessage: statusMessage ?? this.statusMessage,
+      isShaking: isShaking ?? this.isShaking,  // NEW
     );
   }
 
@@ -83,5 +88,6 @@ class QaState extends Equatable {
     errorMessage,
     progress,
     statusMessage,
+    isShaking,  // NEW
   ];
 }

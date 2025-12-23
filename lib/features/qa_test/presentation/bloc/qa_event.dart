@@ -37,6 +37,18 @@ class DeviceFoundEvent extends QaEvent {
 
 class ConnectDevicesEvent extends QaEvent {}
 
+class StartShakingEvent extends QaEvent {}  // NEW
+
+class UpdateShakingEvent extends QaEvent {  // NEW
+  final double progress;
+  final bool isShaking;
+
+  const UpdateShakingEvent(this.progress, this.isShaking);
+
+  @override
+  List<Object?> get props => [progress, isShaking];
+}
+
 class StartTestEvent extends QaEvent {}
 
 class UpdateProgressEvent extends QaEvent {

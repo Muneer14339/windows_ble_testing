@@ -6,6 +6,7 @@ import '../bloc/qa_event.dart';
 import '../bloc/qa_state.dart';
 import '../widgets/device_input_card.dart';
 import '../widgets/scanning_view.dart';
+import '../widgets/shaking_view.dart';  // NEW
 import '../widgets/testing_view.dart';
 import '../widgets/results_view.dart';
 
@@ -172,6 +173,12 @@ class _QaTestPageState extends State<QaTestPage> {
           phase: state.phase,
           statusMessage: state.statusMessage,
         );
+      case QaTestPhase.shaking:  // NEW
+        return ShakingView(
+          statusMessage: state.statusMessage,
+          progress: state.progress,
+          isShaking: state.isShaking,
+        );
       case QaTestPhase.settling:
       case QaTestPhase.testing:
       case QaTestPhase.evaluating:
@@ -261,8 +268,10 @@ class _QaTestPageState extends State<QaTestPage> {
         return 'Scanning for devices';
       case QaTestPhase.connecting:
         return 'Establishing connections';
+      case QaTestPhase.shaking:  // NEW
+        return 'Calibrating with shake';
       case QaTestPhase.settling:
-        return 'Calibrating sensors';
+        return 'Stabilizing sensors';
       case QaTestPhase.testing:
         return 'Running test sequence';
       case QaTestPhase.evaluating:
