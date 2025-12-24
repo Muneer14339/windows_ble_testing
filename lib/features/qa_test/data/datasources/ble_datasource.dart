@@ -59,12 +59,17 @@ print("Data is : $data");
     _isInitialized = true;
   }
 
+
+  // lib/features/qa_test/data/datasources/ble_datasource.dart
+
+// Replace entire _processBuffer method with this:
+
   void _processBuffer(String address) {
     final buffer = _deviceBuffers[address];
     if (buffer == null || buffer.isEmpty) return;
 
-    while (buffer.length >= 10) {
-      // Find sync bytes (0x55 0xAA)
+    while (buffer.length >= 4) { // At least header needed
+      // 1️⃣ GUARD: Find sync bytes (resync on corruption)
       int syncIndex = -1;
       for (int i = 0; i <= buffer.length - 2; i++) {
         if (buffer[i] == 0x55 && buffer[i + 1] == 0xAA) {
@@ -73,8 +78,8 @@ print("Data is : $data");
         }
       }
 
-      // No sync found - keep last byte (might be start of 0x55)
       if (syncIndex == -1) {
+        // No sync found - keep last byte only
         if (buffer.length > 1) buffer.removeRange(0, buffer.length - 1);
         break;
       }
@@ -84,18 +89,26 @@ print("Data is : $data");
         buffer.removeRange(0, syncIndex);
       }
 
-      // Need at least 10 bytes for complete packet
-      if (buffer.length < 10) break;
+      // Check header available
+      if (buffer.length < 4) break;
 
-      // Check if valid packet
+      final cmd = buffer[2];
       final len = buffer[3];
-      if (len != 0x06) {
-        buffer.removeAt(0); // Remove corrupt sync, try next
+
+      // 2️⃣ GUARD: Dynamic frame size + cmd validation BEFORE consuming
+      final frameSize = 4 + len;
+      final isValidCmd = (cmd == 0x08 || cmd == 0x0A) && len == 0x06;
+
+      if (!isValidCmd) {
+        buffer.removeAt(0); // Drop bad sync, resync
         continue;
       }
 
-      // Extract packet
-      final packet = buffer.sublist(0, 10);
+      // 3️⃣ GUARD: Check if complete frame available (no timeout needed for high-rate IMU)
+      if (buffer.length < frameSize) break; // Wait for more data
+
+      // Extract and parse
+      final packet = buffer.sublist(0, frameSize);
       final sample = _parseImuData(packet);
 
       if (sample != null) {
@@ -105,8 +118,8 @@ print("Data is : $data");
         }
       }
 
-      // Remove processed packet
-      buffer.removeRange(0, 10);
+      // Remove processed frame (dynamic size)
+      buffer.removeRange(0, frameSize);
     }
   }
 
