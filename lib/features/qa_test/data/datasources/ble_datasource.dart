@@ -18,6 +18,7 @@ abstract class BleDataSource {
 
 class BleDataSourceImpl implements BleDataSource {
   final Map<String, StreamController<ImuSample>> _deviceStreams = {};
+  final Map<String, List<int>> _deviceBuffers = {}; // NEW: per-device buffer
   StreamSubscription? _globalNotifySubscription;
   StreamSubscription? _scanSubscription;
   StreamController<BleDeviceInfo>? _scanController;
@@ -35,7 +36,7 @@ class BleDataSourceImpl implements BleDataSource {
     _globalNotifySubscription = WinBle.characteristicValueStream.listen((data) {
       try {
         if (data is! Map) return;
-
+print("Data is : $data");
         final eventAddress = data['address']?.toString();
         final eventCharId = data['characteristicId']?.toString();
         final rawValue = data['value'];
@@ -46,17 +47,87 @@ class BleDataSourceImpl implements BleDataSource {
           return;
         }
 
-        final sample = _parseImuData(rawValue.cast<int>());
-        if (sample != null) {
-          final controller = _deviceStreams[eventAddress];
-          if (controller != null && !controller.isClosed) {
-            controller.add(sample);
-          }
-        }
+        // Append bytes to device buffer
+        _deviceBuffers[eventAddress] ??= [];
+        _deviceBuffers[eventAddress]!.addAll(rawValue.cast<int>());
+
+        // Extract all complete packets from buffer
+        _processBuffer(eventAddress);
       } catch (e) {}
     });
 
     _isInitialized = true;
+  }
+
+  void _processBuffer(String address) {
+    final buffer = _deviceBuffers[address];
+    if (buffer == null || buffer.isEmpty) return;
+
+    while (buffer.length >= 10) {
+      // Find sync bytes (0x55 0xAA)
+      int syncIndex = -1;
+      for (int i = 0; i <= buffer.length - 2; i++) {
+        if (buffer[i] == 0x55 && buffer[i + 1] == 0xAA) {
+          syncIndex = i;
+          break;
+        }
+      }
+
+      // No sync found - keep last byte (might be start of 0x55)
+      if (syncIndex == -1) {
+        if (buffer.length > 1) buffer.removeRange(0, buffer.length - 1);
+        break;
+      }
+
+      // Remove junk before sync
+      if (syncIndex > 0) {
+        buffer.removeRange(0, syncIndex);
+      }
+
+      // Need at least 10 bytes for complete packet
+      if (buffer.length < 10) break;
+
+      // Check if valid packet
+      final len = buffer[3];
+      if (len != 0x06) {
+        buffer.removeAt(0); // Remove corrupt sync, try next
+        continue;
+      }
+
+      // Extract packet
+      final packet = buffer.sublist(0, 10);
+      final sample = _parseImuData(packet);
+
+      if (sample != null) {
+        final controller = _deviceStreams[address];
+        if (controller != null && !controller.isClosed) {
+          controller.add(sample);
+        }
+      }
+
+      // Remove processed packet
+      buffer.removeRange(0, 10);
+    }
+  }
+
+  @override
+  Future<void> disconnectDevice(String address) async {
+    try {
+      await _stopNotifications(address);
+      await _deviceStreams[address]?.close();
+      _deviceStreams.remove(address);
+      _deviceBuffers.remove(address); // NEW: cleanup buffer
+      await WinBle.disconnect(address);
+    } catch (e) {}
+  }
+
+  void dispose() {
+    _globalNotifySubscription?.cancel();
+    for (var controller in _deviceStreams.values) {
+      controller.close();
+    }
+    _deviceStreams.clear();
+    _deviceBuffers.clear(); // NEW
   }
 
   @override
@@ -105,16 +176,6 @@ class BleDataSourceImpl implements BleDataSource {
     } catch (e) {
       return false;
     }
-  }
-
-  @override
-  Future<void> disconnectDevice(String address) async {
-    try {
-      await _stopNotifications(address);
-      await _deviceStreams[address]?.close();
-      _deviceStreams.remove(address);
-      await WinBle.disconnect(address);
-    } catch (e) {}
   }
 
   @override
@@ -240,14 +301,6 @@ class BleDataSourceImpl implements BleDataSource {
   int _be16(List<int> data, int offset) {
     final value = (data[offset] << 8) | data[offset + 1];
     return value > 32767 ? value - 65536 : value;
-  }
-
-  void dispose() {
-    _globalNotifySubscription?.cancel();
-    for (var controller in _deviceStreams.values) {
-      controller.close();
-    }
-    _deviceStreams.clear();
   }
 }
 
