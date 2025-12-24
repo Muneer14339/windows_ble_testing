@@ -130,6 +130,10 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     _scanSubscription = null;
   }
 
+  // lib/features/qa_test/presentation/bloc/qa_bloc.dart
+
+// Replace these methods ONLY in qa_bloc.dart:
+
   Future<void> _onConnectDevices(ConnectDevicesEvent event, Emitter<QaState> emit) async {
     await stopScan();
     await _scanSubscription?.cancel();
@@ -159,16 +163,44 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       return;
     }
 
+    // Start streams for all devices
+    for (final address in connected) {
+      _collectedSamples[address] = [];
+      _dataSubscriptions[address] = getDataStream(address).listen(
+            (sample) => _collectedSamples[address]?.add(sample),
+      );
+    }
+
     emit(state.copyWith(
       phase: QaTestPhase.connecting,
       connectedDevices: connected,
       statusMessage: 'Verifying data stream...',
     ));
 
-    // Verify data stream
-    final streamOk = await _verifyDataStream(connected.first);
+    // Verify with retry logic
+    const maxVerifyAttempts = 3;
+    bool verified = false;
 
-    if (!streamOk) {
+    for (int attempt = 1; attempt <= maxVerifyAttempts; attempt++) {
+      verified = await _verifyDataStream(connected.first);
+      if (verified) break;
+
+      if (attempt < maxVerifyAttempts) {
+        emit(state.copyWith(
+          statusMessage: 'Retry verification ($attempt/$maxVerifyAttempts)...',
+        ));
+        await Future.delayed(const Duration(seconds: 1));
+      }
+    }
+
+    if (!verified) {
+      // Cleanup and retry from scratch
+      for (final subscription in _dataSubscriptions.values) {
+        await subscription.cancel();
+      }
+      _dataSubscriptions.clear();
+      _collectedSamples.clear();
+
       for (final address in connected) {
         await stopSensors(address);
         await disconnectDevice(address);
@@ -182,18 +214,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       ));
 
       await Future.delayed(const Duration(seconds: 1));
-      add(const StartScanningEvent(1));
+      add(StartScanningEvent(state.targetDeviceCount));
       return;
-    }
-
-    // Start streams ONCE after verification
-    for (final address in connected) {
-      _collectedSamples[address] = [];
-      _dataSubscriptions[address] = getDataStream(address).listen(
-            (sample) {
-          _collectedSamples[address]?.add(sample);
-        },
-      );
     }
 
     emit(state.copyWith(
@@ -205,22 +227,30 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     add(StartShakingEvent());
   }
 
+  // lib/features/qa_test/presentation/bloc/qa_bloc.dart
+
+// Replace these methods ONLY:
+
   Future<bool> _verifyDataStream(String address) async {
-    bool dataReceived = false;
+    var consecutiveSuccess = 0;
+    const requiredSuccess = 3; // 3 consecutive checks must pass
 
-    final subscription = getDataStream(address).listen(
-          (sample) {
-        dataReceived = true;
-      },
-    );
+    for (int i = 0; i < 5; i++) {
+      final beforeCount = _collectedSamples[address]?.length ?? 0;
+      await Future.delayed(const Duration(seconds: 1));
+      final afterCount = _collectedSamples[address]?.length ?? 0;
 
-    await Future.delayed(const Duration(seconds: 3));
-    await subscription.cancel();
+      if (afterCount > beforeCount) {
+        consecutiveSuccess++;
+        if (consecutiveSuccess >= requiredSuccess) return true;
+      } else {
+        consecutiveSuccess = 0;
+      }
+    }
 
-    return dataReceived;
+    return false;
   }
 
-// _onStartShaking - Stream already running, just use data
   Future<void> _onStartShaking(StartShakingEvent event, Emitter<QaState> emit) async {
     emit(state.copyWith(
       phase: QaTestPhase.shaking,
@@ -232,19 +262,13 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     _recentAccelMagnitudes.clear();
     _lastShakeDetected = DateTime.now();
 
-    // Stream already running, data collecting in background
+    var shakingDuration = 0.0;
+    const requiredShakeDuration = 30.0;
 
     _progressTimer?.cancel();
-    var elapsed = 0.0;
-    const shakeDuration = 30.0;
-
     _progressTimer = Timer.periodic(
       const Duration(milliseconds: 100),
           (timer) {
-        elapsed += 0.1;
-        final progress = elapsed / shakeDuration;
-
-        // Detect shake from already collected samples
         for (final address in state.connectedDevices) {
           final samples = _collectedSamples[address];
           if (samples != null && samples.isNotEmpty) {
@@ -253,8 +277,13 @@ class QaBloc extends Bloc<QaEvent, QaState> {
         }
 
         final timeSinceLastShake = DateTime.now().difference(_lastShakeDetected);
-        final isCurrentlyShaking = timeSinceLastShake.inSeconds < 5;
+        final isCurrentlyShaking = timeSinceLastShake.inSeconds < 2;
 
+        if (isCurrentlyShaking) {
+          shakingDuration += 0.1;
+        }
+
+        final progress = shakingDuration / requiredShakeDuration;
         add(UpdateShakingEvent(progress, isCurrentlyShaking));
 
         if (progress >= 1.0) {
@@ -265,28 +294,30 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     );
   }
 
-// _onStartTest - Stream already running, just clear old data
   Future<void> _onStartTest(StartTestEvent event, Emitter<QaState> emit) async {
+    // Clear all old data first
+    for (final address in state.connectedDevices) {
+      _collectedSamples[address]?.clear();
+    }
+
     emit(state.copyWith(
       phase: QaTestPhase.settling,
       statusMessage: 'Settling for ${_config.settleSeconds}s...',
       progress: 0.0,
     ));
 
-    // Clear shake data but keep stream running
+    await Future.delayed(Duration(seconds: _config.settleSeconds.toInt()));
+
+    // Clear again after settling
     for (final address in state.connectedDevices) {
       _collectedSamples[address]?.clear();
     }
-
-    await Future.delayed(Duration(seconds: _config.settleSeconds.toInt()));
 
     emit(state.copyWith(
       phase: QaTestPhase.testing,
       statusMessage: 'Collecting samples from ${state.connectedDevices.length} device(s)...',
       progress: 0.0,
     ));
-
-    // Stream already collecting data in background!
 
     _progressTimer?.cancel();
     var elapsed = 0.0;
@@ -304,6 +335,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       },
     );
   }
+
+
 
 
   Future<bool> _connectWithRetry(String address) async {
