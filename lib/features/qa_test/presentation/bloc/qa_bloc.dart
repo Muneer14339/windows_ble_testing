@@ -224,7 +224,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     ));
 
     await Future.delayed(const Duration(milliseconds: 500));
-    add(StartShakingEvent());
+    // add(StartShakingEvent());
+    add(StartTestEvent());
   }
 
   // lib/features/qa_test/presentation/bloc/qa_bloc.dart
@@ -397,7 +398,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
     // Detect significant movement (shake)
     // Check if magnitude deviates significantly from 1g (gravity)
-    if ((mag - 1.0).abs() > 0.5) {
+    if ((mag - 1.0).abs() > 0.8) {
       // Significant movement detected
       if (_recentAccelMagnitudes.length >= 10) {
         // Check variance to confirm shake (not just tilt)
@@ -406,7 +407,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
             .map((v) => pow(v - mean, 2))
             .reduce((a, b) => a + b) / _recentAccelMagnitudes.length;
 
-        if (variance > 0.1) {
+        if (variance > 0.25) {
           _lastShakeDetected = DateTime.now();
         }
       }

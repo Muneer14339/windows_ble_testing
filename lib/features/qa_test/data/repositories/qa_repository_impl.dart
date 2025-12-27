@@ -185,7 +185,7 @@ class QaRepositoryImpl implements QaRepository {
       int abnormalCount = 0;
       for (final s in gyroSamples) {
         final mag = sqrt(s.gx * s.gx + s.gy * s.gy + s.gz * s.gz);
-        print("Magnitude : $mag");
+        //print("Magnitude : $mag");
         if (mag > config.abnormalThresholdDeg) {
           abnormalCount++;
         }
@@ -205,10 +205,8 @@ class QaRepositoryImpl implements QaRepository {
       QaStatus status;
       if (isGravityGood && isNoiseGood && isMacGood && isDriftGood && isAbnormalGood) {
         status = QaStatus.pass;
-      } else if (!isGravityGood || abnormalCount >= config.maxAbnormalPerWindow) {
-        status = QaStatus.fail;
       } else {
-        status = QaStatus.warn;
+        status = QaStatus.fail;
       }
 
       return Right(QaResult(

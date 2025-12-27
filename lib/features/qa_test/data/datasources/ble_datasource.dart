@@ -1,5 +1,6 @@
 // lib/features/qa_test/data/datasources/ble_datasource.dart
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:win_ble/win_ble.dart';
 import 'package:win_ble/win_file.dart';
@@ -23,6 +24,8 @@ class BleDataSourceImpl implements BleDataSource {
   StreamSubscription? _scanSubscription;
   StreamController<BleDeviceInfo>? _scanController;
   bool _isInitialized = false;
+  int _notifyCount = 0;
+  Timer? _notifyTimer;
 
   @override
   Future<void> initialize() async {
@@ -31,12 +34,17 @@ class BleDataSourceImpl implements BleDataSource {
       serverPath: await WinServer.path(),
       enableLog: false,
     );
+    _notifyTimer ??= Timer.periodic(const Duration(seconds: 1), (_) {
+       print("1 second mein notifications: $_notifyCount");
+      _notifyCount = 0; // reset for next second
+    });
 
     await _globalNotifySubscription?.cancel();
     _globalNotifySubscription = WinBle.characteristicValueStream.listen((data) {
       try {
         if (data is! Map) return;
-print("Data is : $data");
+        _notifyCount++;
+        saveToFile("Data is : $data");
         final eventAddress = data['address']?.toString();
         final eventCharId = data['characteristicId']?.toString();
         final rawValue = data['value'];
@@ -60,9 +68,22 @@ print("Data is : $data");
   }
 
 
-  // lib/features/qa_test/data/datasources/ble_datasource.dart
+  Future<void> saveToFile(String text) async {
+    try {
+      final file = File(
+        '${Platform.environment['USERPROFILE']}\\Documents\\ble_notify_log.txt',
+      );
 
-// Replace entire _processBuffer method with this:
+      final time = DateTime.now().toIso8601String();
+      await file.writeAsString(
+        '[$time] $text\n',
+        mode: FileMode.append,
+        flush: true,
+      );
+    } catch (e) {
+      // agar file write fail ho jaye
+    }
+  }
 
   void _processBuffer(String address) {
     final buffer = _deviceBuffers[address];
