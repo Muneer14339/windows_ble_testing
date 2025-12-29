@@ -315,6 +315,12 @@ class BleDataSourceImpl implements BleDataSource {
         gy: 0.0,
         gz: 0.0,
         temp: 0.0,
+        rawAx: rx,
+        rawAy: ry,
+        rawAz: rz,
+        rawGx: 0,
+        rawGy: 0,
+        rawGz: 0,
       );
     } else if (cmd == 0x0A) {
       return ImuSample(
@@ -326,6 +332,12 @@ class BleDataSourceImpl implements BleDataSource {
         gy: 500.0 * ry / 28571.0,
         gz: 500.0 * rz / 28571.0,
         temp: 0.0,
+        rawAx: 0,
+        rawAy: 0,
+        rawAz: 0,
+        rawGx: rx,
+        rawGy: ry,
+        rawGz: rz,
       );
     }
 

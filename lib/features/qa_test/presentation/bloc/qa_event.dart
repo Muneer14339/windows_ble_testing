@@ -65,3 +65,13 @@ class EvaluateResultsEvent extends QaEvent {}
 class ResetTestEvent extends QaEvent {}
 
 class CancelTestEvent extends QaEvent {}
+
+// In qa_event.dart
+class HardFailDetectedEvent extends QaEvent {
+  final String address;
+
+  const HardFailDetectedEvent(this.address);
+
+  @override
+  List<Object?> get props => [address];
+}

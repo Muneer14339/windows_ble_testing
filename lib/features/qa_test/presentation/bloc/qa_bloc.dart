@@ -25,6 +25,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
   Timer? _progressTimer;
   final QaConfig _config = const QaConfig();
 
+  final Map<String, int> _saturationCounts = {}; // Add this
+
   // Shaking detection
   final List<double> _recentAccelMagnitudes = [];
   DateTime _lastShakeDetected = DateTime.now();
@@ -49,6 +51,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     on<StartShakingEvent>(_onStartShaking);  // NEW
     on<UpdateShakingEvent>(_onUpdateShaking);  // NEW
     on<StartTestEvent>(_onStartTest);
+    on<HardFailDetectedEvent>(_onHardFailDetected);
     on<UpdateProgressEvent>(_onUpdateProgress);
     on<EvaluateResultsEvent>(_onEvaluateResults);
     on<ResetTestEvent>(_onReset);
@@ -166,8 +169,31 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     // Start streams for all devices
     for (final address in connected) {
       _collectedSamples[address] = [];
+      // In _onConnectDevices, update stream subscription:
+      // In _onConnectDevices, update stream subscription:
       _dataSubscriptions[address] = getDataStream(address).listen(
-            (sample) => _collectedSamples[address]?.add(sample),
+            (sample) {
+          _collectedSamples[address]?.add(sample);
+
+          if (state.phase == QaTestPhase.testing) {
+            final rawValues = [
+              sample.rawAx.abs(),
+              sample.rawAy.abs(),
+              sample.rawAz.abs(),
+              sample.rawGx.abs(),
+              sample.rawGy.abs(),
+              sample.rawGz.abs(),
+            ];
+
+            if (rawValues.any((v) => v >= _config.saturationThreshold)) {
+              _saturationCounts[address] = (_saturationCounts[address] ?? 0) + 1;
+
+              if (_saturationCounts[address]! > 5) {
+                add(HardFailDetectedEvent(address));
+              }
+            }
+          }
+        },
       );
     }
 
@@ -228,8 +254,58 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     add(StartTestEvent());
   }
 
-  // lib/features/qa_test/presentation/bloc/qa_bloc.dart
+  Future<void> _onHardFailDetected(HardFailDetectedEvent event, Emitter<QaState> emit) async {
+    if (state.phase != QaTestPhase.testing) return;
 
+    _progressTimer?.cancel();
+
+    for (final subscription in _dataSubscriptions.values) {
+      await subscription.cancel();
+    }
+    _dataSubscriptions.clear();
+
+    emit(state.copyWith(
+      phase: QaTestPhase.evaluating,
+      statusMessage: 'Evaluating results...',
+      progress: 1.0,
+    ));
+
+    final results = <QaResult>[];
+
+    for (final entry in _collectedSamples.entries) {
+      final result = await evaluateDevice(entry.key, entry.value, _config);
+      result.fold(
+            (failure) {},
+            (qaResult) => results.add(qaResult),
+      );
+    }
+
+    for (final address in state.connectedDevices) {
+      await stopSensors(address);
+      await disconnectDevice(address);
+    }
+
+    String? exportPath;
+    if (results.isNotEmpty) {
+      final exportResult = await exportToExcel(results);
+      exportResult.fold(
+            (failure) => exportPath = null,
+            (path) => exportPath = path,
+      );
+    }
+
+    emit(state.copyWith(
+      phase: QaTestPhase.completed,
+      results: results,
+      deviceSamples: Map.from(_collectedSamples),
+      statusMessage: exportPath != null
+          ? 'Test completed - Data saved to Excel'
+          : 'Test completed - ${results.length} device(s) evaluated',
+      progress: 1.0,
+    ));
+
+    _collectedSamples.clear();
+  }
 // Replace these methods ONLY:
 
   Future<bool> _verifyDataStream(String address) async {
@@ -299,6 +375,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     // Clear all old data first
     for (final address in state.connectedDevices) {
       _collectedSamples[address]?.clear();
+      _saturationCounts[address] = 0;
     }
 
     emit(state.copyWith(
@@ -546,6 +623,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
     await stopScan();
     _collectedSamples.clear();
+    _saturationCounts.clear(); // Add this
     _recentAccelMagnitudes.clear();
   }
 

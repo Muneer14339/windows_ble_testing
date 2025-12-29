@@ -93,134 +93,133 @@ class QaRepositoryImpl implements QaRepository {
 
   @override
   Future<Either<Failure, QaResult>> evaluateDevice(
-      String deviceId, List<ImuSample> samples, QaConfig config) async {
+      String deviceId, List<ImuSample> samples, QaConfig config) async
+  {
     try {
       if (samples.isEmpty) {
         return Right(QaResult(
           deviceId: deviceId,
-          status: QaStatus.fail,
-          macDeg: 0.0,
-          noiseSigma: 0.0,
-          driftDegPerMin: 0.0,
-          gravityMeanG: 0.0,
-          abnormalCount: 0,
+          passed: false,
+          failureReason: QaFailureReason.none,
+          saturationCount: 0,
+          spikeCount: 0,
+          maxAbsRaw: 0,
+          maxDelta: 0,
         ));
       }
 
-      // Separate gyro and accel samples
-      final gyroSamples = <ImuSample>[];
-      final accelSamples = <ImuSample>[];
+      int saturationCount = 0;
+      int maxAbsRaw = 0;
 
+      // Test 1: Hard Saturation Check
       for (final sample in samples) {
-        if (sample.gx != 0.0 || sample.gy != 0.0 || sample.gz != 0.0) {
-          gyroSamples.add(sample);
-        }
-        if (sample.ax != 0.0 || sample.ay != 0.0 || sample.az != 0.0) {
-          accelSamples.add(sample);
+        final rawValues = [
+          sample.rawAx.abs(),
+          sample.rawAy.abs(),
+          sample.rawAz.abs(),
+          sample.rawGx.abs(),
+          sample.rawGy.abs(),
+          sample.rawGz.abs(),
+        ];
+
+        final maxSample = rawValues.reduce(max);
+        maxAbsRaw = max(maxAbsRaw, maxSample);
+
+        if (maxSample >= config.saturationThreshold) {
+          saturationCount++;
         }
       }
 
-      // Calculate gravity mean (magnitude of mean acceleration)
-      double gravityMeanG = 0.0;
-      if (accelSamples.isNotEmpty) {
-        double sumAx = 0.0, sumAy = 0.0, sumAz = 0.0;
-        for (final s in accelSamples) {
-          sumAx += s.ax;
-          sumAy += s.ay;
-          sumAz += s.az;
-        }
-        final meanAx = sumAx / accelSamples.length;
-        final meanAy = sumAy / accelSamples.length;
-        final meanAz = sumAz / accelSamples.length;
-        gravityMeanG = sqrt(meanAx * meanAx + meanAy * meanAy + meanAz * meanAz);
+      if (saturationCount > 5) {
+        return Right(QaResult(
+          deviceId: deviceId,
+          passed: false,
+          failureReason: QaFailureReason.saturationRaw,
+          saturationCount: saturationCount,
+          spikeCount: 0,
+          maxAbsRaw: maxAbsRaw,
+          maxDelta: 0,
+        ));
       }
 
-      // Calculate gyro noise (σ - standard deviation)
-      double noiseSigma = 0.0;
-      if (gyroSamples.isNotEmpty) {
-        double sumGx = 0.0, sumGy = 0.0, sumGz = 0.0;
-        for (final s in gyroSamples) {
-          sumGx += s.gx;
-          sumGy += s.gy;
-          sumGz += s.gz;
-        }
-        final meanGx = sumGx / gyroSamples.length;
-        final meanGy = sumGy / gyroSamples.length;
-        final meanGz = sumGz / gyroSamples.length;
+      // Test 2: Gyro Delta Spike Check (1-second windows)
+      final gyroSamples = samples.where((s) =>
+      s.rawGx != 0 || s.rawGy != 0 || s.rawGz != 0
+      ).toList();
 
-        double variance = 0.0;
-        for (final s in gyroSamples) {
-          final dx = s.gx - meanGx;
-          final dy = s.gy - meanGy;
-          final dz = s.gz - meanGz;
-          variance += (dx * dx + dy * dy + dz * dz);
-        }
-        variance /= gyroSamples.length;
-        noiseSigma = sqrt(variance);
-      }
+      int spikeCount = 0;
+      int maxDelta = 0;
 
-      // Calculate drift (linear fit of gyro magnitude over time)
-      double driftDegPerMin = 0.0;
       if (gyroSamples.length > 1) {
-        final firstTime = gyroSamples.first.timestampS;
-        final lastTime = gyroSamples.last.timestampS;
-        final duration = lastTime - firstTime;
+        final windowStartTime = gyroSamples.first.timestampS;
+        var windowSamples = <ImuSample>[];
 
-        if (duration > 0) {
-          final firstMag = sqrt(
-              gyroSamples.first.gx * gyroSamples.first.gx +
-                  gyroSamples.first.gy * gyroSamples.first.gy +
-                  gyroSamples.first.gz * gyroSamples.first.gz
-          );
-          final lastMag = sqrt(
-              gyroSamples.last.gx * gyroSamples.last.gx +
-                  gyroSamples.last.gy * gyroSamples.last.gy +
-                  gyroSamples.last.gz * gyroSamples.last.gz
-          );
-          driftDegPerMin = ((lastMag - firstMag) / duration) * 60.0;
+        for (final sample in gyroSamples) {
+          if (sample.timestampS - windowStartTime <= 1.0) {
+            windowSamples.add(sample);
+          } else {
+            // Process window
+            spikeCount += _countSpikesInWindow(windowSamples, config.gyroDeltaThreshold);
+            maxDelta = max(maxDelta, _getMaxDeltaInWindow(windowSamples));
+
+            // Start new window
+            windowSamples = [sample];
+          }
+        }
+
+        // Process last window
+        if (windowSamples.isNotEmpty) {
+          spikeCount += _countSpikesInWindow(windowSamples, config.gyroDeltaThreshold);
+          maxDelta = max(maxDelta, _getMaxDeltaInWindow(windowSamples));
         }
       }
 
-      // Count abnormal samples (gyro magnitude > threshold)
-      int abnormalCount = 0;
-      for (final s in gyroSamples) {
-        final mag = sqrt(s.gx * s.gx + s.gy * s.gy + s.gz * s.gz);
-        //print("Magnitude : $mag");
-        if (mag > config.abnormalThresholdDeg) {
-          abnormalCount++;
-        }
-      }
-
-      // Calculate MAC (Mean Absolute Change) - simplified as noise for now
-      final macDeg = noiseSigma;
-
-      // Determine status based on PDF criteria
-      final gravityDeviation = (gravityMeanG - 1.0).abs();
-      final isGravityGood = gravityDeviation <= config.gravityDeviationG;
-      final isNoiseGood = noiseSigma <= config.maxNoiseSigmaDeg;
-      final isMacGood = macDeg <= config.maxMacDeg;
-      final isDriftGood = driftDegPerMin.abs() <= config.maxDriftDegPerMin;
-      final isAbnormalGood = abnormalCount < config.maxAbnormalPerWindow;
-
-      QaStatus status;
-      if (isGravityGood && isNoiseGood && isMacGood && isDriftGood && isAbnormalGood) {
-        status = QaStatus.pass;
-      } else {
-        status = QaStatus.fail;
-      }
+      final passed = spikeCount < config.maxSpikeCount;
 
       return Right(QaResult(
         deviceId: deviceId,
-        status: status,
-        macDeg: macDeg,
-        noiseSigma: noiseSigma,
-        driftDegPerMin: driftDegPerMin,
-        gravityMeanG: gravityMeanG,
-        abnormalCount: abnormalCount,
+        passed: passed,
+        failureReason: passed ? QaFailureReason.none : QaFailureReason.gyroDeltaSpike,
+        saturationCount: 0,
+        spikeCount: spikeCount,
+        maxAbsRaw: maxAbsRaw,
+        maxDelta: maxDelta,
       ));
     } catch (e) {
       return Left(TestFailure(e.toString()));
     }
+  }
+
+  int _countSpikesInWindow(List<ImuSample> samples, int threshold) {
+    int count = 0;
+    for (int i = 1; i < samples.length; i++) {
+      final prev = samples[i - 1];
+      final curr = samples[i];
+
+      final deltaGx = (curr.rawGx - prev.rawGx).abs();
+      final deltaGy = (curr.rawGy - prev.rawGy).abs();
+      final deltaGz = (curr.rawGz - prev.rawGz).abs();
+
+      if (deltaGx > threshold || deltaGy > threshold || deltaGz > threshold) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  int _getMaxDeltaInWindow(List<ImuSample> samples) {
+    int maxDelta = 0;
+    for (int i = 1; i < samples.length; i++) {
+      final prev = samples[i - 1];
+      final curr = samples[i];
+
+      final deltaGx = (curr.rawGx - prev.rawGx).abs();
+      final deltaGy = (curr.rawGy - prev.rawGy).abs();
+      final deltaGz = (curr.rawGz - prev.rawGz).abs();
+
+      maxDelta = max(maxDelta, max(deltaGx, max(deltaGy, deltaGz)));
+    }
+    return maxDelta;
   }
 
   @override

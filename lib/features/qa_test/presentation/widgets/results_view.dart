@@ -12,9 +12,8 @@ class ResultsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final passCount = results.where((r) => r.status == QaStatus.pass).length;
-    final warnCount = results.where((r) => r.status == QaStatus.warn).length;
-    final failCount = results.where((r) => r.status == QaStatus.fail).length;
+    final passCount = results.where((r) => r.passed).length;
+    final failCount = results.length - passCount;
 
     return Column(
       children: [
@@ -26,7 +25,7 @@ class ResultsView extends StatelessWidget {
                 constraints: const BoxConstraints(maxWidth: 1000),
                 child: Column(
                   children: [
-                    _buildSummaryCard(passCount, warnCount, failCount),
+                    _buildSummaryCard(passCount, failCount),
                     const SizedBox(height: 24),
                     _buildResultsList(),
                   ],
@@ -40,57 +39,6 @@ class ResultsView extends StatelessWidget {
     );
   }
 
-  Widget _buildSummaryCard(int pass, int warn, int fail) {
-    final total = results.length;
-    final overallStatus = fail > 0
-        ? QaStatus.fail
-        : warn > 0
-        ? QaStatus.warn
-        : QaStatus.pass;
-
-    return Container(
-      padding: const EdgeInsets.all(40),
-      decoration: AppDecorations.cardDecoration(borderColor: overallStatus.color.withOpacity(0.3)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            overallStatus.icon,
-            size: 64,
-            color: overallStatus.color,
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Test Complete',
-            style: TextStyle(
-              color: AppColors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Tested $total device${total != 1 ? 's' : ''}',
-            style: TextStyle(
-              color: AppColors.whiteWithOpacity(0.7),
-              fontSize: 16,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            alignment: WrapAlignment.center,
-            children: [
-              _buildStatusBadge('Pass', pass, AppColors.green),
-              _buildStatusBadge('Warn', warn, AppColors.orange),
-              _buildStatusBadge('Fail', fail, AppColors.red),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildStatusBadge(String label, int count, Color color) {
     return Container(
@@ -160,7 +108,43 @@ class ResultsView extends StatelessWidget {
     );
   }
 
-  Widget _buildResultItem(QaResult result, int number) {
+  Widget _buildSummaryCard(int pass, int fail)
+  {
+    final total = results.length;
+    final passed = results.where((r) => r.passed).length;
+    final failed = total - passed;
+
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: AppDecorations.cardDecoration(
+          borderColor: (failed > 0 ? AppColors.red : AppColors.green).withOpacity(0.3)
+      ),
+      child: Column(
+        children: [
+          Icon(
+            failed > 0 ? Icons.error : Icons.check_circle,
+            size: 64,
+            color: failed > 0 ? AppColors.red : AppColors.green,
+          ),
+          const SizedBox(height: 20),
+          const Text('Test Complete', style: TextStyle(color: AppColors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Text('Tested $total device${total != 1 ? 's' : ''}', style: TextStyle(color: AppColors.whiteWithOpacity(0.7), fontSize: 16)),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 12,
+            children: [
+              _buildStatusBadge('Pass', passed, AppColors.green),
+              _buildStatusBadge('Fail', failed, AppColors.red),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultItem(QaResult result, int number)
+  {
     return Container(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -171,70 +155,53 @@ class ResultsView extends StatelessWidget {
               Container(
                 width: 48,
                 height: 48,
-                decoration: AppDecorations.statusBadge(result.status.color),
+                decoration: AppDecorations.statusBadge(result.passed ? AppColors.green : AppColors.red),
                 child: Center(
-                  child: Text(
-                    '$number',
-                    style: TextStyle(
-                      color: result.status.color,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: Text('$number', style: TextStyle(color: result.passed ? AppColors.green : AppColors.red, fontSize: 20, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      result.deviceId,
-                      style: AppTextStyles.body.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+                child: Text(result.deviceId, style: AppTextStyles.body.copyWith(color: AppColors.white, fontWeight: FontWeight.w600)),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: AppDecorations.statusBadge(result.status.color),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      result.status.icon,
-                      color: result.status.color,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      result.status.label,
-                      style: TextStyle(
-                        color: result.status.color,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                decoration: AppDecorations.statusBadge(result.passed ? AppColors.green : AppColors.red),
+                child: Text(
+                  result.passed ? 'PASS' : 'FAIL',
+                  style: TextStyle(color: result.passed ? AppColors.green : AppColors.red, fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildMetricChip('Gravity', '${result.gravityMeanG.toStringAsFixed(3)}g'),
-              _buildMetricChip('MAC', '${result.macDeg.toStringAsFixed(3)}°'),
-              _buildMetricChip('Noise σ', '${result.noiseSigma.toStringAsFixed(3)}°'),
-              _buildMetricChip('Drift', '${result.driftDegPerMin.toStringAsFixed(3)}°/min'),
-              _buildMetricChip('Abnormal', '${result.abnormalCount}'),
-            ],
-          ),
+          if (!result.passed) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.redWithOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.redWithOpacity(0.3)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Failure: ${result.failureReason.label}', style: TextStyle(color: AppColors.red, fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (result.saturationCount > 0) _buildMetricChip('Saturations', '${result.saturationCount}'),
+                      if (result.spikeCount > 0) _buildMetricChip('Spikes', '${result.spikeCount}'),
+                      _buildMetricChip('Max Raw', '${result.maxAbsRaw}'),
+                      _buildMetricChip('Max Δ', '${result.maxDelta}'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

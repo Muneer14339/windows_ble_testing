@@ -43,16 +43,15 @@ class ExcelDataSourceImpl implements ExcelDataSource {
   void _createHeaders(Excel excel) {
     final sheet = excel['Results'];
 
-    sheet.cell(CellIndex.indexByString('A1')).value =  TextCellValue('Test Date');
-    sheet.cell(CellIndex.indexByString('B1')).value =  TextCellValue('Device ID');
-    sheet.cell(CellIndex.indexByString('C1')).value =  TextCellValue('Status');
-    sheet.cell(CellIndex.indexByString('D1')).value =  TextCellValue('Gravity (g)');
-    sheet.cell(CellIndex.indexByString('E1')).value =  TextCellValue('MAC (°)');
-    sheet.cell(CellIndex.indexByString('F1')).value = TextCellValue('Noise σ (°)');
-    sheet.cell(CellIndex.indexByString('G1')).value = TextCellValue('Drift (°/min)');
-    sheet.cell(CellIndex.indexByString('H1')).value = TextCellValue('Abnormal Count');
+    sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Test Date');
+    sheet.cell(CellIndex.indexByString('B1')).value = TextCellValue('Device ID');
+    sheet.cell(CellIndex.indexByString('C1')).value = TextCellValue('Status');
+    sheet.cell(CellIndex.indexByString('D1')).value = TextCellValue('Failure Reason');
+    sheet.cell(CellIndex.indexByString('E1')).value = TextCellValue('Saturation Count');
+    sheet.cell(CellIndex.indexByString('F1')).value = TextCellValue('Spike Count');
+    sheet.cell(CellIndex.indexByString('G1')).value = TextCellValue('Max Raw');
+    sheet.cell(CellIndex.indexByString('H1')).value = TextCellValue('Max Delta');
 
-    // Header styling
     for (int i = 0; i < 8; i++) {
       final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
       cell.cellStyle = CellStyle(
@@ -91,22 +90,21 @@ class ExcelDataSourceImpl implements ExcelDataSource {
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: nextRow))
           .value = TextCellValue(result.deviceId);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: nextRow))
-          .value = TextCellValue(result.status.label);
+          .value = TextCellValue(result.passed ? 'PASS' : 'FAIL');
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: nextRow))
-          .value = DoubleCellValue(result.gravityMeanG);
+          .value = TextCellValue(result.failureReason.label);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: nextRow))
-          .value = DoubleCellValue(result.macDeg);
+          .value = IntCellValue(result.saturationCount);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: nextRow))
-          .value = DoubleCellValue(result.noiseSigma);
+          .value = IntCellValue(result.spikeCount);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: nextRow))
-          .value = DoubleCellValue(result.driftDegPerMin);
+          .value = IntCellValue(result.maxAbsRaw);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: nextRow))
-          .value = IntCellValue(result.abnormalCount);
+          .value = IntCellValue(result.maxDelta);
 
-      // Status color coding
       final statusCell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: nextRow));
       statusCell.cellStyle = CellStyle(
-        backgroundColorHex: _getStatusColor(result.status),
+        backgroundColorHex: result.passed ? ExcelColor.green : ExcelColor.red,
       );
 
       nextRow++;

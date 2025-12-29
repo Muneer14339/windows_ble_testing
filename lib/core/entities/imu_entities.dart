@@ -3,13 +3,8 @@ import 'package:flutter/material.dart';
 
 class ImuSample extends Equatable {
   final double timestampS;
-  final double ax;
-  final double ay;
-  final double az;
-  final double gx;
-  final double gy;
-  final double gz;
-  final double temp;
+  final double ax, ay, az, gx, gy, gz, temp;
+  final int rawAx, rawAy, rawAz, rawGx, rawGy, rawGz; // NEW: raw int16 values
 
   const ImuSample({
     required this.timestampS,
@@ -20,10 +15,73 @@ class ImuSample extends Equatable {
     required this.gy,
     required this.gz,
     required this.temp,
+    required this.rawAx,
+    required this.rawAy,
+    required this.rawAz,
+    required this.rawGx,
+    required this.rawGy,
+    required this.rawGz,
   });
 
   @override
-  List<Object?> get props => [timestampS, ax, ay, az, gx, gy, gz, temp];
+  List<Object?> get props => [timestampS, ax, ay, az, gx, gy, gz, temp, rawAx, rawAy, rawAz, rawGx, rawGy, rawGz];
+}
+
+enum QaFailureReason { none, saturationRaw, gyroDeltaSpike }
+
+class QaResult extends Equatable {
+  final String deviceId;
+  final bool passed;
+  final QaFailureReason failureReason;
+  final int saturationCount;
+  final int spikeCount;
+  final int maxAbsRaw;
+  final int maxDelta;
+
+  const QaResult({
+    required this.deviceId,
+    required this.passed,
+    required this.failureReason,
+    required this.saturationCount,
+    required this.spikeCount,
+    required this.maxAbsRaw,
+    required this.maxDelta,
+  });
+
+  @override
+  List<Object?> get props => [deviceId, passed, failureReason, saturationCount, spikeCount, maxAbsRaw, maxDelta];
+}
+
+class QaConfig extends Equatable {
+  final double settleSeconds;
+  final double testSeconds;
+  final int saturationThreshold;
+  final int gyroDeltaThreshold;
+  final int maxSpikeCount;
+
+  const QaConfig({
+    this.settleSeconds = 5.0,
+    this.testSeconds = 60.0,
+    this.saturationThreshold = 32000,
+    this.gyroDeltaThreshold = 5000,
+    this.maxSpikeCount = 3,
+  });
+
+  @override
+  List<Object?> get props => [settleSeconds, testSeconds, saturationThreshold, gyroDeltaThreshold, maxSpikeCount];
+}
+
+extension QaFailureReasonHelper on QaFailureReason {
+  String get label {
+    switch (this) {
+      case QaFailureReason.none:
+        return 'PASS';
+      case QaFailureReason.saturationRaw:
+        return 'SATURATION_RAW_AXIS';
+      case QaFailureReason.gyroDeltaSpike:
+        return 'GYRO_DELTA_SPIKE';
+    }
+  }
 }
 
 class BleDeviceInfo extends Equatable {
@@ -42,74 +100,6 @@ class BleDeviceInfo extends Equatable {
 }
 
 enum QaStatus { pass, warn, fail }
-
-class QaResult extends Equatable {
-  final String deviceId;
-  final QaStatus status;
-  final double macDeg;
-  final double noiseSigma;
-  final double driftDegPerMin;
-  final double gravityMeanG;
-  final int abnormalCount;
-
-  const QaResult({
-    required this.deviceId,
-    required this.status,
-    required this.macDeg,
-    required this.noiseSigma,
-    required this.driftDegPerMin,
-    required this.gravityMeanG,
-    required this.abnormalCount,
-  });
-
-  @override
-  List<Object?> get props => [
-    deviceId,
-    status,
-    macDeg,
-    noiseSigma,
-    driftDegPerMin,
-    gravityMeanG,
-    abnormalCount,
-  ];
-}
-
-class QaConfig extends Equatable {
-  final double settleSeconds;
-  final double testSeconds;
-  final double abnormalThresholdDeg;
-  final double gravityDeviationG;
-  final double gyroStillnessDegPerS;
-  final int maxAbnormalPerWindow;
-  final double maxMacDeg;
-  final double maxNoiseSigmaDeg;
-  final double maxDriftDegPerMin;
-
-  const QaConfig({
-    this.settleSeconds = 5.0,
-    this.testSeconds = 60.0,
-    this.abnormalThresholdDeg = 4,
-    this.gravityDeviationG = 1,
-    this.gyroStillnessDegPerS = 0.5,
-    this.maxAbnormalPerWindow = 100,
-    this.maxMacDeg = 1,
-    this.maxNoiseSigmaDeg = 1,
-    this.maxDriftDegPerMin = 1,
-  });
-
-  @override
-  List<Object?> get props => [
-    settleSeconds,
-    testSeconds,
-    abnormalThresholdDeg,
-    gravityDeviationG,
-    gyroStillnessDegPerS,
-    maxAbnormalPerWindow,
-    maxMacDeg,
-    maxNoiseSigmaDeg,
-    maxDriftDegPerMin,
-  ];
-}
 
 extension QaStatusHelper on QaStatus {
   Color get color {
