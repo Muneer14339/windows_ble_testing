@@ -243,14 +243,14 @@ class BleDataSourceImpl implements BleDataSource {
       await Future.delayed(const Duration(milliseconds: 300));
 
       await _writeCommand(address, writeUuid, [0x55, 0xAA, 0xF0, 0x00]);
-      await Future.delayed(const Duration(milliseconds: 200));
-      await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x11, 0x02, 0x00, 0x02]);
+      // await Future.delayed(const Duration(milliseconds: 200));
+      // await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x11, 0x02, 0x00, 0x02]);
       await Future.delayed(const Duration(milliseconds: 200));
       await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x0A, 0x00]);
       await Future.delayed(const Duration(milliseconds: 200));
       await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x08, 0x00]);
-      await Future.delayed(const Duration(milliseconds: 200));
-      await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x06, 0x00]);
+      // await Future.delayed(const Duration(milliseconds: 200));
+      // await _writeCommand(address, writeUuid, [0x55, 0xAA, 0x06, 0x00]);
     } catch (e) {
       throw Exception('Failed to start sensors: $e');
     }
