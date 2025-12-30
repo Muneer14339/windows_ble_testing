@@ -177,7 +177,7 @@ class BleDataSourceImpl implements BleDataSource {
       if (name.isEmpty || name == "N/A") return;
       final address = device.address.trim();
       if (address.isEmpty || address == "N/A" || address.endsWith("14")) return;
-      if (!name.startsWith("GMSync")) return;
+      if (!name.startsWith("GMSync") && !name.startsWith("SK") && !name.startsWith("RA")) return;
       if (seenAddresses.contains(device.address)) return;
 
       seenAddresses.add(device.address);
