@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/entities/imu_entities.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/localization/app_translations.dart';
+import 'animated_icon_widget.dart';
 
 class ScanningView extends StatelessWidget {
   final List<BleDeviceInfo> foundDevices;
@@ -57,22 +58,9 @@ class ScanningView extends StatelessWidget {
   }
 
   Widget _buildIcon() {
-    return Container(
-      width: 120,
-      height: 120,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.blueWithOpacity(0.1),
-        border: Border.all(
-          color: AppColors.blueWithOpacity(0.3),
-          width: 2,
-        ),
-      ),
-      child: Icon(
-        isConnecting ? Icons.link : Icons.radar,
-        size: 60,
-        color: AppColors.blue,
-      ),
+    return AnimatedIconWidget(
+      icon: isConnecting ? Icons.link : Icons.radar,
+      animationType: AnimationType.rotate,
     );
   }
 

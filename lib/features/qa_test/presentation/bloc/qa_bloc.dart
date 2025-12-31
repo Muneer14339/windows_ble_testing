@@ -53,6 +53,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     on<DiscardDeviceEvent>(_onDiscardDevice);
     on<StopTestEvent>(_onStopTest);
     on<ResetTestEvent>(_onReset);
+    on<DataStreamErrorEvent>(_onDataStreamError);
+    on<DeviceDisconnectedEvent>(_onDeviceDisconnected);
   }
 
   String _t(String key, {List<String>? args}) {
@@ -221,6 +223,8 @@ class QaBloc extends Bloc<QaEvent, QaState> {
           }
         }
       },
+      onError: (_) => add(const DeviceDisconnectedEvent()),
+      onDone: () => add(const DeviceDisconnectedEvent()),
     );
 
     // Verify data stream
@@ -230,9 +234,13 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     final afterCount = _collectedSamples[address]?.length ?? 0;
 
     if (afterCount <= beforeCount) {
+      await _cleanup();
       emit(state.copyWith(
-        phase: QaTestPhase.error,
-        errorMessage: 'No data received from sensor',
+        phase: QaTestPhase.idle,
+        toastMessage: _t('dataStreamError'),
+        clearSession: true,
+        clearResult: true,
+        connectedDeviceAddress: null,
       ));
       return;
     }
@@ -413,8 +421,10 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     ));
   }
 
+  // _onStopTest ko replace karo
   Future<void> _onStopTest(StopTestEvent event, Emitter<QaState> emit) async {
     await _cleanup();
+
     emit(state.copyWith(
       phase: QaTestPhase.idle,
       clearSession: true,
@@ -422,9 +432,33 @@ class QaBloc extends Bloc<QaEvent, QaState> {
       progress: 0.0,
       foundDevices: [],
       connectedDeviceAddress: null,
+      statusMessage: _t('readyToStart'),
+    ));
+  }
+// Naye event handlers add karo
+  Future<void> _onDataStreamError(DataStreamErrorEvent event, Emitter<QaState> emit) async {
+    await _cleanup();
+    emit(state.copyWith(
+      phase: QaTestPhase.idle,
+      toastMessage: _t('dataStreamError'),
+      clearSession: true,
+      clearResult: true,
+      connectedDeviceAddress: null,
     ));
   }
 
+  Future<void> _onDeviceDisconnected(DeviceDisconnectedEvent event, Emitter<QaState> emit) async {
+    if (state.phase == QaTestPhase.idle || state.phase == QaTestPhase.completed) return;
+
+    await _cleanup();
+    emit(state.copyWith(
+      phase: QaTestPhase.idle,
+      toastMessage: _t('deviceDisconnected'),
+      clearSession: true,
+      clearResult: true,
+      connectedDeviceAddress: null,
+    ));
+  }
   Future<void> _onReset(ResetTestEvent event, Emitter<QaState> emit) async {
     await _cleanup();
     emit(QaState.initial().copyWith(
@@ -435,17 +469,22 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     add(const InitializeQaEvent());
   }
 
+  // _cleanup method ko replace karo
   Future<void> _cleanup() async {
     _progressTimer?.cancel();
+
+    await stopScan();
     await _scanSubscription?.cancel();
+    _scanSubscription = null;
+
     await _dataSubscription?.cancel();
+    _dataSubscription = null;
 
     if (state.connectedDeviceAddress != null) {
       await stopSensors(state.connectedDeviceAddress!);
       await disconnectDevice(state.connectedDeviceAddress!);
     }
 
-    await stopScan();
     _collectedSamples.clear();
     _saturationCounts.clear();
   }

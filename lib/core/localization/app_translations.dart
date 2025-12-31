@@ -23,10 +23,14 @@ class AppTranslations {
       
       // Initial Screen
       'rulesTitle': '测试规则',
-      'rule1': '将传感器放在平面上',
-      'rule2': '确保传感器在测试期间保持静止',
-      'rule3': '每个设备有 3 次测试机会',
-      'rule4': '测试将自动运行 60 秒',
+      'rule1': '第一次测试通过 → 设备良好，继续下一个测试',
+      'rule2': '第一次测试失败 → 重新测试（第二次尝试）',
+      'rule2Sub1': '第二次通过 → 设备良好，测试下一个',
+      'rule2Sub2': '第二次失败 → 重新测试（第三次尝试）',
+      'rule3': '第三次测试：',
+      'rule3Sub1': '通过 → 设备良好，测试下一个',
+      'rule3Sub2': '失败 → 标记为坏传感器并丢弃',
+      'rulesNote': '每个设备最多可尝试 3 次',
       
       // Scanning Screen
       'scanningTitle': '扫描设备',
@@ -92,6 +96,9 @@ class AppTranslations {
       'attempt': '尝试',
       'device': '设备',
       'mac': 'MAC 地址',
+
+      'dataStreamError': '无数据流 - 正在断开连接',
+      'deviceDisconnected': '设备已断开连接',
     },
     'en': {
       // App Title
@@ -115,11 +122,15 @@ class AppTranslations {
       'testAgainBtn': 'Test Again',
       
       // Initial Screen
-      'rulesTitle': 'Testing Rules',
-      'rule1': 'Place sensor on flat surface',
-      'rule2': 'Keep sensor stationary during test',
-      'rule3': 'Each device has 3 test attempts',
-      'rule4': 'Test will run automatically for 60 seconds',
+      'rulesTitle': 'Test rules',
+      'rule1': 'First test passed → Equipment is good, proceed to the next test.',
+      'rule2': 'First test failed → Retest (second attempt)',
+      'rule2Sub1': 'Passed the second time → Equipment is good, test the next one.',
+      'rule2Sub2': 'Second failure → Retest (third attempt)',
+      'rule3': 'Third test:',
+      'rule3Sub1': 'Pass → Equipment is good, test the next one.',
+      'rule3Sub2': 'Failure → Mark as bad sensor and set aside',
+      'rulesNote': 'Each device can attempt a maximum of 3 times.',
       
       // Scanning Screen
       'scanningTitle': 'Scanning for Devices',
@@ -185,6 +196,9 @@ class AppTranslations {
       'attempt': 'Attempt',
       'device': 'Device',
       'mac': 'MAC Address',
+
+      'dataStreamError': 'No data stream - disconnecting',
+      'deviceDisconnected': 'Device disconnected',
     },
   };
 

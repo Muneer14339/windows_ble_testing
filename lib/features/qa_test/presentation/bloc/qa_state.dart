@@ -27,6 +27,7 @@ class QaState extends Equatable {
   final String? errorMessage;
   final double progress;
   final String statusMessage;
+  final String? toastMessage;
 
   const QaState({
     required this.phase,
@@ -42,6 +43,7 @@ class QaState extends Equatable {
     this.errorMessage,
     this.progress = 0.0,
     this.statusMessage = '',
+    this.toastMessage,
   });
 
   factory QaState.initial() {
@@ -68,6 +70,8 @@ class QaState extends Equatable {
     String? statusMessage,
     bool clearSession = false,
     bool clearResult = false,
+    String? toastMessage,
+    bool clearToast = false,
   }) {
     return QaState(
       phase: phase ?? this.phase,
@@ -83,6 +87,7 @@ class QaState extends Equatable {
       errorMessage: errorMessage,
       progress: progress ?? this.progress,
       statusMessage: statusMessage ?? this.statusMessage,
+      toastMessage: clearToast ? null : (toastMessage ?? this.toastMessage),
     );
   }
 
@@ -101,5 +106,6 @@ class QaState extends Equatable {
     errorMessage,
     progress,
     statusMessage,
+    toastMessage,
   ];
 }

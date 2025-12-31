@@ -42,6 +42,17 @@ class _QaTestPageState extends State<QaTestPage> {
               ),
             );
           }
+
+          if (state.toastMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.toastMessage!),
+                backgroundColor: AppColors.orange,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+            context.read<QaBloc>().add(const ResetTestEvent());
+          }
         },
         builder: (context, state) {
           return Container(
@@ -339,7 +350,10 @@ class _QaTestPageState extends State<QaTestPage> {
     showDialog(
       context: context,
       barrierDismissible: true,
-      builder: (context) => const StopModal(),
+      builder: (dialogContext) => BlocProvider.value(
+        value: context.read<QaBloc>(),
+        child: const StopModal(),
+      ),
     );
   }
 }

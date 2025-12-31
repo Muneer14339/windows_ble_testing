@@ -87,3 +87,10 @@ class StopTestEvent extends QaEvent {
 class ResetTestEvent extends QaEvent {
   const ResetTestEvent();
 }
+class DataStreamErrorEvent extends QaEvent {
+  const DataStreamErrorEvent();
+}
+
+class DeviceDisconnectedEvent extends QaEvent {
+  const DeviceDisconnectedEvent();
+}

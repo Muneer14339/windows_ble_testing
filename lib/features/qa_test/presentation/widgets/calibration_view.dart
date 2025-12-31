@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/localization/app_translations.dart';
+import 'animated_icon_widget.dart';
 
 class CalibrationView extends StatelessWidget {
   final String language;
@@ -32,7 +33,10 @@ class CalibrationView extends StatelessWidget {
                     width: 2,
                   ),
                 ),
-                child: const Icon(Icons.tune, size: 60, color: AppColors.blue),
+                child: const AnimatedIconWidget(
+                  icon: Icons.tune,
+                  animationType: AnimationType.pulse,
+                ),
               ),
               const SizedBox(height: 30),
               Text(

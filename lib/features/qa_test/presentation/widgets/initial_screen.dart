@@ -77,20 +77,66 @@ class InitialScreen extends StatelessWidget {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _t('rulesTitle'),
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: AppColors.blue,
+          Center(
+            child: Text(
+              _t('rulesTitle'),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.blue,
+              ),
             ),
           ),
           const SizedBox(height: 20),
-          _buildRule('1', _t('rule1')),
-          _buildRule('2', _t('rule2')),
-          _buildRule('3', _t('rule3')),
-          _buildRule('4', _t('rule4')),
+          _buildRule('1.', _t('rule1')),
+          _buildRule('2.', _t('rule2')),
+          _buildSubRule(_t('rule2Sub1')),
+          _buildSubRule(_t('rule2Sub2')),
+          _buildRule('3.', _t('rule3')),
+          _buildSubRule(_t('rule3Sub1')),
+          _buildSubRule(_t('rule3Sub2')),
+          const SizedBox(height: 16),
+          Center(
+            child: Text(
+              _t('rulesNote'),
+              style: const TextStyle(
+                color: AppColors.blue,
+                fontSize: 15,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubRule(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '• ',
+            style: const TextStyle(
+              color: AppColors.blue,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                height: 1.6,
+              ),
+            ),
+          ),
         ],
       ),
     );
