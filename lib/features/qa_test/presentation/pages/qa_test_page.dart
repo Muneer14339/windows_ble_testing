@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../bloc/qa_bloc.dart';
 import '../bloc/qa_event.dart';
 import '../bloc/qa_state.dart';
-import '../widgets/device_input_card.dart';
+import '../widgets/initial_screen.dart';
 import '../widgets/scanning_view.dart';
-import '../widgets/shaking_view.dart';  // NEW
+import '../widgets/calibration_view.dart';
 import '../widgets/testing_view.dart';
-import '../widgets/results_view.dart';
+import '../widgets/results_pass_view.dart';
+import '../widgets/results_fail_view.dart';
+import '../widgets/results_bad_view.dart';
+import '../widgets/stop_modal.dart';
 
 class QaTestPage extends StatefulWidget {
   const QaTestPage({super.key});
@@ -21,7 +25,7 @@ class _QaTestPageState extends State<QaTestPage> {
   @override
   void initState() {
     super.initState();
-    context.read<QaBloc>().add(InitializeQaEvent());
+    context.read<QaBloc>().add(const InitializeQaEvent());
   }
 
   @override
@@ -41,7 +45,7 @@ class _QaTestPageState extends State<QaTestPage> {
         },
         builder: (context, state) {
           return Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -50,13 +54,13 @@ class _QaTestPageState extends State<QaTestPage> {
                   AppColors.secondary,
                   AppColors.primary,
                 ],
-                stops: [0.0, 0.5, 1.0],
+                stops: const [0.0, 0.5, 1.0],
               ),
             ),
             child: SafeArea(
               child: Column(
                 children: [
-                  _buildAppBar(context, state),
+                  _buildHeader(context, state),
                   Expanded(
                     child: _buildContent(context, state),
                   ),
@@ -69,25 +73,31 @@ class _QaTestPageState extends State<QaTestPage> {
     );
   }
 
-  Widget _buildAppBar(BuildContext context, QaState state) {
-    return Container(
+  Widget _buildHeader(BuildContext context, QaState state) {
+    final t = (String key, {List<String>? args}) =>
+        AppTranslations.translate(key, state.currentLanguage, args: args);
+
+    return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
+          // App Icon & Title
           Container(
-            padding: const EdgeInsets.all(10),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: AppColors.blueWithOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: AppColors.blueWithOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: const Icon(
-              Icons.analytics_outlined,
               color: AppColors.blue,
-              size: 24,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: Text(
+                'RA',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -95,65 +105,79 @@ class _QaTestPageState extends State<QaTestPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'IMU QA Tester',
-                  style: TextStyle(
+                Text(
+                  t('appTitle'),
+                  style: const TextStyle(
                     color: AppColors.white,
                     fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
-                  _getSubtitle(state.phase),
-                  style: TextStyle(
-                    color: AppColors.whiteWithOpacity(0.6),
-                    fontSize: 12,
-                  ),
+                  _getSubtitle(state, t),
+                  style: AppTextStyles.subtitle,
                 ),
               ],
             ),
           ),
-          if (state.phase != QaTestPhase.idle &&
-              state.phase != QaTestPhase.completed)
-            _buildCancelButton(context),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCancelButton(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => context.read<QaBloc>().add(CancelTestEvent()),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.redWithOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: AppColors.redWithOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.close, color: AppColors.red, size: 18),
-              SizedBox(width: 6),
-              Text(
-                'Cancel',
-                style: TextStyle(
-                  color: AppColors.red,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+          // Language Toggle
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.read<QaBloc>().add(const ToggleLanguageEvent()),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.blueWithOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.blueWithOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  t('langSwitch'),
+                  style: const TextStyle(
+                    color: AppColors.blue,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+          // Stop Button (visible during test)
+          if (_shouldShowStopButton(state.phase)) ...[
+            const SizedBox(width: 12),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _showStopModal(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.redWithOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.redWithOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    t('stopBtn'),
+                    style: const TextStyle(
+                      color: AppColors.red,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -162,43 +186,66 @@ class _QaTestPageState extends State<QaTestPage> {
     switch (state.phase) {
       case QaTestPhase.idle:
       case QaTestPhase.initializing:
-        return DeviceInputCard(
+        return InitialScreen(
           isLoading: state.phase == QaTestPhase.initializing,
+          language: state.currentLanguage,
         );
       case QaTestPhase.scanning:
+        return ScanningView(
+          foundDevices: state.foundDevices,
+          language: state.currentLanguage,
+        );
       case QaTestPhase.connecting:
         return ScanningView(
-          targetCount: state.targetDeviceCount,
           foundDevices: state.foundDevices,
-          phase: state.phase,
-          statusMessage: state.statusMessage,
-        );
-      case QaTestPhase.shaking:  // NEW
-        return ShakingView(
-          statusMessage: state.statusMessage,
-          progress: state.progress,
-          isShaking: state.isShaking,
+          language: state.currentLanguage,
+          isConnecting: true,
         );
       case QaTestPhase.settling:
+        return CalibrationView(language: state.currentLanguage);
       case QaTestPhase.testing:
       case QaTestPhase.evaluating:
         return TestingView(
           phase: state.phase,
-          statusMessage: state.statusMessage,
           progress: state.progress,
-          connectedDeviceCount: state.connectedDevices.length,
-          deviceSampleCounts: state.sampleCounts.isNotEmpty ? state.sampleCounts : null,
+          sampleCount: state.sampleCounts.values.isNotEmpty
+              ? state.sampleCounts.values.first
+              : 0,
+          macAddress: state.connectedDeviceAddress ?? '',
+          language: state.currentLanguage,
         );
       case QaTestPhase.completed:
-        return ResultsView(results: state.results);
+        if (state.currentResult == null) return const SizedBox.shrink();
+
+        if (state.currentResult!.passed) {
+          return ResultsPassView(
+            result: state.currentResult!,
+            language: state.currentLanguage,
+          );
+        } else if (state.currentSession!.currentAttempt >= 3) {
+          return ResultsBadView(
+            result: state.currentResult!,
+            badDevices: state.badDevices,
+            language: state.currentLanguage,
+          );
+        } else {
+          return ResultsFailView(
+            result: state.currentResult!,
+            attemptNumber: state.currentSession!.currentAttempt,
+            language: state.currentLanguage,
+          );
+        }
       case QaTestPhase.error:
         return _buildErrorView(state);
     }
   }
 
   Widget _buildErrorView(QaState state) {
+    final t = (String key) =>
+        AppTranslations.translate(key, state.currentLanguage);
+
     return Center(
-      child: SingleChildScrollView(
+      child: Padding(
         padding: const EdgeInsets.all(24),
         child: Container(
           constraints: const BoxConstraints(maxWidth: 600),
@@ -216,9 +263,9 @@ class _QaTestPageState extends State<QaTestPage> {
             children: [
               const Icon(Icons.error_outline, color: AppColors.red, size: 56),
               const SizedBox(height: 20),
-              const Text(
-                'Error',
-                style: TextStyle(
+              Text(
+                t('error'),
+                style: const TextStyle(
                   color: AppColors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -235,20 +282,21 @@ class _QaTestPageState extends State<QaTestPage> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: () => context.read<QaBloc>().add(ResetTestEvent()),
+                onPressed: () => context.read<QaBloc>().add(const ResetTestEvent()),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.blue,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 14,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
-                  'Try Again',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                child: Text(
+                  t('testAgainBtn'),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ],
@@ -258,28 +306,40 @@ class _QaTestPageState extends State<QaTestPage> {
     );
   }
 
-  String _getSubtitle(QaTestPhase phase) {
-    switch (phase) {
+  String _getSubtitle(QaState state, String Function(String, {List<String>? args}) t) {
+    switch (state.phase) {
       case QaTestPhase.idle:
-        return 'Ready to start testing';
+        return t('headerSubtitle');
       case QaTestPhase.initializing:
-        return 'Initializing system...';
+        return t('initializing');
       case QaTestPhase.scanning:
-        return 'Scanning for devices';
+        return t('headerSubtitleScanning');
       case QaTestPhase.connecting:
-        return 'Establishing connections';
-      case QaTestPhase.shaking:  // NEW
-        return 'Calibrating with shake';
+        return t('headerSubtitleConnecting');
       case QaTestPhase.settling:
-        return 'Stabilizing sensors';
+        return t('headerSubtitleCalibrating');
       case QaTestPhase.testing:
-        return 'Running test sequence';
+        return t('headerSubtitleCollecting');
       case QaTestPhase.evaluating:
-        return 'Analyzing results';
       case QaTestPhase.completed:
-        return 'Test complete';
+        return t('headerSubtitleComplete');
       case QaTestPhase.error:
-        return 'Error occurred';
+        return t('error');
     }
+  }
+
+  bool _shouldShowStopButton(QaTestPhase phase) {
+    return phase != QaTestPhase.idle &&
+           phase != QaTestPhase.initializing &&
+           phase != QaTestPhase.completed &&
+           phase != QaTestPhase.error;
+  }
+
+  void _showStopModal(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => const StopModal(),
+    );
   }
 }

@@ -6,7 +6,6 @@ enum QaTestPhase {
   initializing,
   scanning,
   connecting,
-  shaking,  // NEW
   settling,
   testing,
   evaluating,
@@ -16,78 +15,91 @@ enum QaTestPhase {
 
 class QaState extends Equatable {
   final QaTestPhase phase;
-  final int targetDeviceCount;
+  final String currentLanguage;
+  final DeviceTestSession? currentSession;
   final List<BleDeviceInfo> foundDevices;
-  final List<String> connectedDevices;
+  final String? connectedDeviceAddress;
   final Map<String, List<ImuSample>> deviceSamples;
   final Map<String, int> sampleCounts;
-  final List<QaResult> results;
+  final QaResult? currentResult;
+  final List<BadDevice> badDevices;
+  final List<QaResult> passedDevices;
   final String? errorMessage;
   final double progress;
   final String statusMessage;
-  final bool isShaking;  // NEW
 
   const QaState({
     required this.phase,
-    this.targetDeviceCount = 0,
+    this.currentLanguage = 'zh',
+    this.currentSession,
     this.foundDevices = const [],
-    this.connectedDevices = const [],
+    this.connectedDeviceAddress,
     this.deviceSamples = const {},
     this.sampleCounts = const {},
-    this.results = const [],
+    this.currentResult,
+    this.badDevices = const [],
+    this.passedDevices = const [],
     this.errorMessage,
     this.progress = 0.0,
     this.statusMessage = '',
-    this.isShaking = false,  // NEW
   });
 
   factory QaState.initial() {
     return const QaState(
       phase: QaTestPhase.idle,
-      statusMessage: 'Ready to start',
+      currentLanguage: 'zh',
+      statusMessage: '准备开始',
     );
   }
 
   QaState copyWith({
     QaTestPhase? phase,
-    int? targetDeviceCount,
+    String? currentLanguage,
+    DeviceTestSession? currentSession,
     List<BleDeviceInfo>? foundDevices,
-    List<String>? connectedDevices,
+    String? connectedDeviceAddress,
     Map<String, List<ImuSample>>? deviceSamples,
     Map<String, int>? sampleCounts,
-    List<QaResult>? results,
+    QaResult? currentResult,
+    List<BadDevice>? badDevices,
+    List<QaResult>? passedDevices,
     String? errorMessage,
     double? progress,
     String? statusMessage,
-    bool? isShaking,  // NEW
+    bool clearSession = false,
+    bool clearResult = false,
   }) {
     return QaState(
       phase: phase ?? this.phase,
-      targetDeviceCount: targetDeviceCount ?? this.targetDeviceCount,
+      currentLanguage: currentLanguage ?? this.currentLanguage,
+      currentSession: clearSession ? null : (currentSession ?? this.currentSession),
       foundDevices: foundDevices ?? this.foundDevices,
-      connectedDevices: connectedDevices ?? this.connectedDevices,
+      connectedDeviceAddress: connectedDeviceAddress ?? this.connectedDeviceAddress,
       deviceSamples: deviceSamples ?? this.deviceSamples,
       sampleCounts: sampleCounts ?? this.sampleCounts,
-      results: results ?? this.results,
+      currentResult: clearResult ? null : (currentResult ?? this.currentResult),
+      badDevices: badDevices ?? this.badDevices,
+      passedDevices: passedDevices ?? this.passedDevices,
       errorMessage: errorMessage,
       progress: progress ?? this.progress,
       statusMessage: statusMessage ?? this.statusMessage,
-      isShaking: isShaking ?? this.isShaking,  // NEW
     );
   }
 
   @override
   List<Object?> get props => [
     phase,
-    targetDeviceCount,
+    currentLanguage,
+    currentSession,
     foundDevices,
-    connectedDevices,
+    connectedDeviceAddress,
     deviceSamples,
     sampleCounts,
-    results,
+    currentResult,
+    badDevices,
+    passedDevices,
     errorMessage,
     progress,
     statusMessage,
-    isShaking,  // NEW
   ];
 }

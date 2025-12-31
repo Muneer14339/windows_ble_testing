@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 class ImuSample extends Equatable {
   final double timestampS;
   final double ax, ay, az, gx, gy, gz, temp;
-  final int rawAx, rawAy, rawAz, rawGx, rawGy, rawGz; // NEW: raw int16 values
+  final int rawAx, rawAy, rawAz, rawGx, rawGy, rawGz;
 
   const ImuSample({
     required this.timestampS,
@@ -31,25 +31,86 @@ enum QaFailureReason { none, saturationRaw, gyroDeltaSpike }
 
 class QaResult extends Equatable {
   final String deviceId;
+  final String macAddress;
   final bool passed;
   final QaFailureReason failureReason;
   final int saturationCount;
   final int spikeCount;
   final int maxAbsRaw;
   final int maxDelta;
+  final int attemptNumber;
+  final bool isBadSensor;
 
   const QaResult({
     required this.deviceId,
+    required this.macAddress,
     required this.passed,
     required this.failureReason,
     required this.saturationCount,
     required this.spikeCount,
     required this.maxAbsRaw,
     required this.maxDelta,
+    this.attemptNumber = 1,
+    this.isBadSensor = false,
   });
 
   @override
-  List<Object?> get props => [deviceId, passed, failureReason, saturationCount, spikeCount, maxAbsRaw, maxDelta];
+  List<Object?> get props => [
+    deviceId, 
+    macAddress,
+    passed, 
+    failureReason, 
+    saturationCount, 
+    spikeCount, 
+    maxAbsRaw, 
+    maxDelta,
+    attemptNumber,
+    isBadSensor,
+  ];
+}
+
+class BadDevice extends Equatable {
+  final String macAddress;
+  final String deviceName;
+  final DateTime failedAt;
+
+  const BadDevice({
+    required this.macAddress,
+    required this.deviceName,
+    required this.failedAt,
+  });
+
+  @override
+  List<Object?> get props => [macAddress, deviceName, failedAt];
+}
+
+class DeviceTestSession extends Equatable {
+  final String macAddress;
+  final String deviceName;
+  final int currentAttempt;
+  final List<QaResult> attemptResults;
+
+  const DeviceTestSession({
+    required this.macAddress,
+    required this.deviceName,
+    this.currentAttempt = 1,
+    this.attemptResults = const [],
+  });
+
+  DeviceTestSession copyWith({
+    int? currentAttempt,
+    List<QaResult>? attemptResults,
+  }) {
+    return DeviceTestSession(
+      macAddress: macAddress,
+      deviceName: deviceName,
+      currentAttempt: currentAttempt ?? this.currentAttempt,
+      attemptResults: attemptResults ?? this.attemptResults,
+    );
+  }
+
+  @override
+  List<Object?> get props => [macAddress, deviceName, currentAttempt, attemptResults];
 }
 
 class QaConfig extends Equatable {

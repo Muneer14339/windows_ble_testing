@@ -1,8 +1,8 @@
-// lib/features/qa_test/presentation/bloc/qa_bloc.dart
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/entities/imu_entities.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../domain/usecases/qa_usecases.dart';
 import 'qa_event.dart';
 import 'qa_state.dart';
@@ -20,16 +20,11 @@ class QaBloc extends Bloc<QaEvent, QaState> {
   final ExportToExcel exportToExcel;
 
   StreamSubscription? _scanSubscription;
-  final Map<String, StreamSubscription> _dataSubscriptions = {};
+  StreamSubscription? _dataSubscription;
   final Map<String, List<ImuSample>> _collectedSamples = {};
   Timer? _progressTimer;
   final QaConfig _config = const QaConfig();
-
-  final Map<String, int> _saturationCounts = {}; // Add this
-
-  // Shaking detection
-  final List<double> _recentAccelMagnitudes = [];
-  DateTime _lastShakeDetected = DateTime.now();
+  final Map<String, int> _saturationCounts = {};
 
   QaBloc({
     required this.initializeBle,
@@ -44,24 +39,30 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     required this.exportToExcel,
   }) : super(QaState.initial()) {
     on<InitializeQaEvent>(_onInitialize);
-    on<StartScanningEvent>(_onStartScanning);
-    on<StopScanningEvent>(_onStopScanning);
-    on<DeviceFoundEvent>(_onDeviceFound);
-    on<ConnectDevicesEvent>(_onConnectDevices);
-    on<StartShakingEvent>(_onStartShaking);  // NEW
-    on<UpdateShakingEvent>(_onUpdateShaking);  // NEW
+    on<ToggleLanguageEvent>(_onToggleLanguage);
     on<StartTestEvent>(_onStartTest);
-    on<HardFailDetectedEvent>(_onHardFailDetected);
+    on<DeviceFoundEvent>(_onDeviceFound);
+    on<ConnectFirstDeviceEvent>(_onConnectFirstDevice);
+    on<StartSensorsEvent>(_onStartSensors);
+    on<StartDataCollectionEvent>(_onStartDataCollection);
     on<UpdateProgressEvent>(_onUpdateProgress);
-    on<EvaluateResultsEvent>(_onEvaluateResults);
+    on<HardFailDetectedEvent>(_onHardFailDetected);
+    on<EvaluateResultEvent>(_onEvaluateResult);
+    on<RetryTestEvent>(_onRetryTest);
+    on<TestNextDeviceEvent>(_onTestNextDevice);
+    on<DiscardDeviceEvent>(_onDiscardDevice);
+    on<StopTestEvent>(_onStopTest);
     on<ResetTestEvent>(_onReset);
-    on<CancelTestEvent>(_onCancel);
+  }
+
+  String _t(String key, {List<String>? args}) {
+    return AppTranslations.translate(key, state.currentLanguage, args: args);
   }
 
   Future<void> _onInitialize(InitializeQaEvent event, Emitter<QaState> emit) async {
     emit(state.copyWith(
       phase: QaTestPhase.initializing,
-      statusMessage: 'Initializing BLE...',
+      statusMessage: _t('initializing'),
     ));
 
     final result = await initializeBle();
@@ -69,26 +70,30 @@ class QaBloc extends Bloc<QaEvent, QaState> {
           (failure) => emit(state.copyWith(
         phase: QaTestPhase.error,
         errorMessage: failure.message,
-        statusMessage: 'Initialization failed',
+        statusMessage: _t('error'),
       )),
           (_) => emit(state.copyWith(
         phase: QaTestPhase.idle,
-        statusMessage: 'Ready to start',
+        statusMessage: _t('readyToStart'),
       )),
     );
-    add(const StartScanningEvent(1));
   }
 
-  Future<void> _onStartScanning(StartScanningEvent event, Emitter<QaState> emit) async {
+  Future<void> _onToggleLanguage(ToggleLanguageEvent event, Emitter<QaState> emit) async {
+    final newLang = state.currentLanguage == 'zh' ? 'en' : 'zh';
+    emit(state.copyWith(currentLanguage: newLang));
+  }
+
+  Future<void> _onStartTest(StartTestEvent event, Emitter<QaState> emit) async {
     emit(state.copyWith(
       phase: QaTestPhase.scanning,
-      targetDeviceCount: event.targetDeviceCount,
       foundDevices: [],
-      statusMessage: 'Scanning for ${event.targetDeviceCount} GMSync device(s)...',
+      statusMessage: _t('scanningForDevices'),
+      clearSession: true,
+      clearResult: true,
     ));
 
     await _scanSubscription?.cancel();
-
     _scanSubscription = scanDevices().listen(
           (result) {
         result.fold(
@@ -116,284 +121,146 @@ class QaBloc extends Bloc<QaEvent, QaState> {
         rssi: event.rssi,
       ));
 
-      emit(state.copyWith(
-        foundDevices: updatedDevices,
-        statusMessage: 'Found ${updatedDevices.length}/${state.targetDeviceCount} devices',
-      ));
+      emit(state.copyWith(foundDevices: updatedDevices));
 
-      if (updatedDevices.length >= state.targetDeviceCount) {
-        add(ConnectDevicesEvent());
+      // Auto-connect to first RA device found
+      if (updatedDevices.length == 1) {
+        add(const ConnectFirstDeviceEvent());
       }
     }
   }
 
-  Future<void> _onStopScanning(StopScanningEvent event, Emitter<QaState> emit) async {
-    await stopScan();
-    await _scanSubscription?.cancel();
-    _scanSubscription = null;
-  }
-
-  // lib/features/qa_test/presentation/bloc/qa_bloc.dart
-
-// Replace these methods ONLY in qa_bloc.dart:
-
-  Future<void> _onConnectDevices(ConnectDevicesEvent event, Emitter<QaState> emit) async {
+  Future<void> _onConnectFirstDevice(ConnectFirstDeviceEvent event, Emitter<QaState> emit) async {
     await stopScan();
     await _scanSubscription?.cancel();
 
-    emit(state.copyWith(
-      phase: QaTestPhase.connecting,
-      statusMessage: 'Connecting to ${state.foundDevices.length} devices...',
-    ));
-
-    final connectionResults = await Future.wait(
-      state.foundDevices.map((device) => _connectWithRetry(device.address)),
-    );
-
-    final connected = connectionResults
-        .asMap()
-        .entries
-        .where((entry) => entry.value)
-        .map((entry) => state.foundDevices[entry.key].address)
-        .toList();
-
-    if (connected.isEmpty) {
+    if (state.foundDevices.isEmpty) {
       emit(state.copyWith(
         phase: QaTestPhase.error,
-        errorMessage: 'Failed to connect to any devices',
-        statusMessage: 'Connection failed',
+        errorMessage: 'No devices found',
       ));
       return;
     }
 
-    // Start streams for all devices
-    for (final address in connected) {
-      _collectedSamples[address] = [];
-      // In _onConnectDevices, update stream subscription:
-      // In _onConnectDevices, update stream subscription:
-      _dataSubscriptions[address] = getDataStream(address).listen(
-            (sample) {
-          _collectedSamples[address]?.add(sample);
+    final device = state.foundDevices.first;
 
-          if (state.phase == QaTestPhase.testing) {
-            final rawValues = [
-              sample.rawAx.abs(),
-              sample.rawAy.abs(),
-              sample.rawAz.abs(),
-              sample.rawGx.abs(),
-              sample.rawGy.abs(),
-              sample.rawGz.abs(),
-            ];
+    // Initialize session if new device
+    final session = state.currentSession ?? DeviceTestSession(
+      macAddress: device.address,
+      deviceName: device.name,
+      currentAttempt: 1,
+    );
 
-            if (rawValues.any((v) => v >= _config.saturationThreshold)) {
-              _saturationCounts[address] = (_saturationCounts[address] ?? 0) + 1;
+    emit(state.copyWith(
+      phase: QaTestPhase.connecting,
+      currentSession: session,
+      statusMessage: _t('connecting'),
+    ));
 
-              if (_saturationCounts[address]! > 5) {
-                add(HardFailDetectedEvent(address));
-              }
+    final connectResult = await connectDevice(device.address);
+    final connected = await connectResult.fold(
+          (failure) async => false,
+          (_) async => true,
+    );
+
+    if (!connected) {
+      emit(state.copyWith(
+        phase: QaTestPhase.error,
+        errorMessage: 'Failed to connect',
+      ));
+      return;
+    }
+
+    emit(state.copyWith(connectedDeviceAddress: device.address));
+    add(const StartSensorsEvent());
+  }
+
+  Future<void> _onStartSensors(StartSensorsEvent event, Emitter<QaState> emit) async {
+    final address = state.connectedDeviceAddress;
+    if (address == null) return;
+
+    final startResult = await startSensors(address);
+    final started = await startResult.fold(
+          (failure) async => false,
+          (_) async => true,
+    );
+
+    if (!started) {
+      emit(state.copyWith(
+        phase: QaTestPhase.error,
+        errorMessage: 'Failed to start sensors',
+      ));
+      return;
+    }
+
+    // Set up data stream
+    _collectedSamples[address] = [];
+    _saturationCounts[address] = 0;
+
+    await _dataSubscription?.cancel();
+    _dataSubscription = getDataStream(address).listen(
+          (sample) {
+        _collectedSamples[address]?.add(sample);
+
+        if (state.phase == QaTestPhase.testing) {
+          final rawValues = [
+            sample.rawAx.abs(),
+            sample.rawAy.abs(),
+            sample.rawAz.abs(),
+            sample.rawGx.abs(),
+            sample.rawGy.abs(),
+            sample.rawGz.abs(),
+          ];
+
+          if (rawValues.any((v) => v >= _config.saturationThreshold)) {
+            _saturationCounts[address] = (_saturationCounts[address] ?? 0) + 1;
+
+            if (_saturationCounts[address]! > 5) {
+              add(HardFailDetectedEvent(address));
             }
           }
-        },
-      );
-    }
-
-    emit(state.copyWith(
-      phase: QaTestPhase.connecting,
-      connectedDevices: connected,
-      statusMessage: 'Verifying data stream...',
-    ));
-
-    // Verify with retry logic
-    const maxVerifyAttempts = 3;
-    bool verified = false;
-
-    for (int attempt = 1; attempt <= maxVerifyAttempts; attempt++) {
-      verified = await _verifyDataStream(connected.first);
-      if (verified) break;
-
-      if (attempt < maxVerifyAttempts) {
-        emit(state.copyWith(
-          statusMessage: 'Retry verification ($attempt/$maxVerifyAttempts)...',
-        ));
-        await Future.delayed(const Duration(seconds: 1));
-      }
-    }
-
-    if (!verified) {
-      // Cleanup and retry from scratch
-      for (final subscription in _dataSubscriptions.values) {
-        await subscription.cancel();
-      }
-      _dataSubscriptions.clear();
-      _collectedSamples.clear();
-
-      for (final address in connected) {
-        await stopSensors(address);
-        await disconnectDevice(address);
-      }
-
-      emit(state.copyWith(
-        phase: QaTestPhase.scanning,
-        connectedDevices: [],
-        foundDevices: [],
-        statusMessage: 'Data stream failed, retrying...',
-      ));
-
-      await Future.delayed(const Duration(seconds: 1));
-      add(StartScanningEvent(state.targetDeviceCount));
-      return;
-    }
-
-    emit(state.copyWith(
-      phase: QaTestPhase.connecting,
-      statusMessage: 'Connection verified!',
-    ));
-
-    await Future.delayed(const Duration(milliseconds: 500));
-    // add(StartShakingEvent());
-    add(StartTestEvent());
-  }
-
-  Future<void> _onHardFailDetected(HardFailDetectedEvent event, Emitter<QaState> emit) async {
-    if (state.phase != QaTestPhase.testing) return;
-
-    _progressTimer?.cancel();
-
-    for (final subscription in _dataSubscriptions.values) {
-      await subscription.cancel();
-    }
-    _dataSubscriptions.clear();
-
-    emit(state.copyWith(
-      phase: QaTestPhase.evaluating,
-      statusMessage: 'Evaluating results...',
-      progress: 1.0,
-    ));
-
-    final results = <QaResult>[];
-
-    for (final entry in _collectedSamples.entries) {
-      final result = await evaluateDevice(entry.key, entry.value, _config);
-      result.fold(
-            (failure) {},
-            (qaResult) => results.add(qaResult),
-      );
-    }
-
-    for (final address in state.connectedDevices) {
-      await stopSensors(address);
-      await disconnectDevice(address);
-    }
-
-    String? exportPath;
-    if (results.isNotEmpty) {
-      final exportResult = await exportToExcel(results);
-      exportResult.fold(
-            (failure) => exportPath = null,
-            (path) => exportPath = path,
-      );
-    }
-
-    emit(state.copyWith(
-      phase: QaTestPhase.completed,
-      results: results,
-      deviceSamples: Map.from(_collectedSamples),
-      statusMessage: exportPath != null
-          ? 'Test completed - Data saved to Excel'
-          : 'Test completed - ${results.length} device(s) evaluated',
-      progress: 1.0,
-    ));
-
-    _collectedSamples.clear();
-  }
-// Replace these methods ONLY:
-
-  Future<bool> _verifyDataStream(String address) async {
-    var consecutiveSuccess = 0;
-    const requiredSuccess = 3; // 3 consecutive checks must pass
-
-    for (int i = 0; i < 5; i++) {
-      final beforeCount = _collectedSamples[address]?.length ?? 0;
-      await Future.delayed(const Duration(seconds: 1));
-      final afterCount = _collectedSamples[address]?.length ?? 0;
-
-      if (afterCount > beforeCount) {
-        consecutiveSuccess++;
-        if (consecutiveSuccess >= requiredSuccess) return true;
-      } else {
-        consecutiveSuccess = 0;
-      }
-    }
-
-    return false;
-  }
-
-  Future<void> _onStartShaking(StartShakingEvent event, Emitter<QaState> emit) async {
-    emit(state.copyWith(
-      phase: QaTestPhase.shaking,
-      statusMessage: 'Shake the device for 30 seconds...',
-      progress: 0.0,
-      isShaking: false,
-    ));
-
-    _recentAccelMagnitudes.clear();
-    _lastShakeDetected = DateTime.now();
-
-    var shakingDuration = 0.0;
-    const requiredShakeDuration = 30.0;
-
-    _progressTimer?.cancel();
-    _progressTimer = Timer.periodic(
-      const Duration(milliseconds: 100),
-          (timer) {
-        for (final address in state.connectedDevices) {
-          final samples = _collectedSamples[address];
-          if (samples != null && samples.isNotEmpty) {
-            _detectShake(samples.last);
-          }
-        }
-
-        final timeSinceLastShake = DateTime.now().difference(_lastShakeDetected);
-        final isCurrentlyShaking = timeSinceLastShake.inSeconds < 2;
-
-        if (isCurrentlyShaking) {
-          shakingDuration += 0.1;
-        }
-
-        final progress = shakingDuration / requiredShakeDuration;
-        add(UpdateShakingEvent(progress, isCurrentlyShaking));
-
-        if (progress >= 1.0) {
-          timer.cancel();
-          add(StartTestEvent());
         }
       },
     );
-  }
 
-  Future<void> _onStartTest(StartTestEvent event, Emitter<QaState> emit) async {
-    // Clear all old data first
-    for (final address in state.connectedDevices) {
-      _collectedSamples[address]?.clear();
-      _saturationCounts[address] = 0;
+    // Verify data stream
+    await Future.delayed(const Duration(seconds: 1));
+    final beforeCount = _collectedSamples[address]?.length ?? 0;
+    await Future.delayed(const Duration(seconds: 1));
+    final afterCount = _collectedSamples[address]?.length ?? 0;
+
+    if (afterCount <= beforeCount) {
+      emit(state.copyWith(
+        phase: QaTestPhase.error,
+        errorMessage: 'No data received from sensor',
+      ));
+      return;
     }
 
+    add(const StartDataCollectionEvent());
+  }
+
+  Future<void> _onStartDataCollection(StartDataCollectionEvent event, Emitter<QaState> emit) async {
+    final address = state.connectedDeviceAddress;
+    if (address == null) return;
+
+    // Settling phase
     emit(state.copyWith(
       phase: QaTestPhase.settling,
-      statusMessage: 'Settling for ${_config.settleSeconds}s...',
+      statusMessage: _t('settling', args: [_config.settleSeconds.toStringAsFixed(0)]),
       progress: 0.0,
     ));
 
     await Future.delayed(Duration(seconds: _config.settleSeconds.toInt()));
 
-    // Clear again after settling
-    for (final address in state.connectedDevices) {
-      _collectedSamples[address]?.clear();
-    }
+    // Clear samples after settling
+    _collectedSamples[address]?.clear();
+    _saturationCounts[address] = 0;
 
+    // Testing phase
     emit(state.copyWith(
       phase: QaTestPhase.testing,
-      statusMessage: 'Collecting samples from ${state.connectedDevices.length} device(s)...',
+      statusMessage: _t('collecting'),
       progress: 0.0,
     ));
 
@@ -408,223 +275,179 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
         if (progress >= 1.0) {
           timer.cancel();
-          add(EvaluateResultsEvent());
+          add(const EvaluateResultEvent());
         }
       },
     );
   }
 
-
-
-
-  Future<bool> _connectWithRetry(String address) async {
-    const maxRetries = 3;
-
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        final connectResult = await connectDevice(address);
-        final connected = await connectResult.fold(
-              (failure) async => false,
-              (_) async => true,
-        );
-
-        if (!connected) {
-          if (attempt < maxRetries) {
-            await Future.delayed(Duration(milliseconds: 500 * attempt));
-            continue;
-          }
-          return false;
-        }
-
-        await Future.delayed(const Duration(milliseconds: 300));
-
-        final startResult = await startSensors(address);
-        final started = await startResult.fold(
-              (failure) async => false,
-              (_) async => true,
-        );
-
-        if (started) return true;
-
-        if (attempt < maxRetries) {
-          await Future.delayed(Duration(milliseconds: 500 * attempt));
-        }
-      } catch (e) {
-        if (attempt == maxRetries) return false;
-        await Future.delayed(Duration(milliseconds: 500 * attempt));
-      }
-    }
-
-    return false;
-  }
-
-  void _detectShake(ImuSample sample) {
-    // Calculate acceleration magnitude
-    final mag = sqrt(
-        sample.ax * sample.ax +
-            sample.ay * sample.ay +
-            sample.az * sample.az
-    );
-
-    _recentAccelMagnitudes.add(mag);
-
-    // Keep only last 50 samples (~1 second of data at 50Hz)
-    if (_recentAccelMagnitudes.length > 50) {
-      _recentAccelMagnitudes.removeAt(0);
-    }
-
-    // Detect significant movement (shake)
-    // Check if magnitude deviates significantly from 1g (gravity)
-    if ((mag - 1.0).abs() > 0.8) {
-      // Significant movement detected
-      if (_recentAccelMagnitudes.length >= 10) {
-        // Check variance to confirm shake (not just tilt)
-        final mean = _recentAccelMagnitudes.reduce((a, b) => a + b) / _recentAccelMagnitudes.length;
-        final variance = _recentAccelMagnitudes
-            .map((v) => pow(v - mean, 2))
-            .reduce((a, b) => a + b) / _recentAccelMagnitudes.length;
-
-        if (variance > 0.25) {
-          _lastShakeDetected = DateTime.now();
-        }
-      }
-    }
-  }
-
-  Future<void> _onUpdateShaking(UpdateShakingEvent event, Emitter<QaState> emit) async {
-    if (state.phase == QaTestPhase.shaking) {
-      emit(state.copyWith(
-        progress: event.progress,
-        isShaking: event.isShaking,
-        statusMessage: event.isShaking
-            ? 'Good! Keep shaking... ${(event.progress * 100).toInt()}%'
-            : 'No shaking detected, please shake the device!',
-      ));
-    }
-  }
-
   Future<void> _onUpdateProgress(UpdateProgressEvent event, Emitter<QaState> emit) async {
     if (state.phase == QaTestPhase.testing) {
-      final counts = <String, int>{};
-      for (final address in state.connectedDevices) {
-        counts[address] = _collectedSamples[address]?.length ?? 0;
-      }
+      final address = state.connectedDeviceAddress;
+      final count = address != null ? (_collectedSamples[address]?.length ?? 0) : 0;
 
       emit(state.copyWith(
         progress: event.progress,
-        sampleCounts: counts,
-        statusMessage: 'Collecting... ${(event.progress * 100).toInt()}%',
+        sampleCounts: {if (address != null) address: count},
       ));
     }
   }
 
-  Future<void> _onEvaluateResults(EvaluateResultsEvent event, Emitter<QaState> emit) async {
+  Future<void> _onHardFailDetected(HardFailDetectedEvent event, Emitter<QaState> emit) async {
     _progressTimer?.cancel();
+    add(const EvaluateResultEvent());
+  }
 
-    for (final subscription in _dataSubscriptions.values) {
-      await subscription.cancel();
-    }
-    _dataSubscriptions.clear();
+  Future<void> _onEvaluateResult(EvaluateResultEvent event, Emitter<QaState> emit) async {
+    _progressTimer?.cancel();
+    // DON'T cancel data subscription - needed for retry
+
+    final address = state.connectedDeviceAddress;
+    if (address == null || state.currentSession == null) return;
 
     emit(state.copyWith(
       phase: QaTestPhase.evaluating,
-      statusMessage: 'Evaluating results from ${state.connectedDevices.length} device(s)...',
+      statusMessage: _t('evaluating'),
       progress: 1.0,
     ));
 
-    final results = <QaResult>[];
+    final samples = _collectedSamples[address] ?? [];
+    final result = await evaluateDevice(address, samples, _config);
 
-    for (final entry in _collectedSamples.entries) {
-      final result = await evaluateDevice(entry.key, entry.value, _config);
-      result.fold(
-            (failure) {},
-            (qaResult) => results.add(qaResult),
-      );
-    }
+    await result.fold(
+          (failure) async {
+        emit(state.copyWith(
+          phase: QaTestPhase.error,
+          errorMessage: failure.message,
+        ));
+      },
+          (qaResult) async {
+        final updatedResult = QaResult(
+          deviceId: qaResult.deviceId,
+          macAddress: state.currentSession!.macAddress,
+          passed: qaResult.passed,
+          failureReason: qaResult.failureReason,
+          saturationCount: qaResult.saturationCount,
+          spikeCount: qaResult.spikeCount,
+          maxAbsRaw: qaResult.maxAbsRaw,
+          maxDelta: qaResult.maxDelta,
+          attemptNumber: state.currentSession!.currentAttempt,
+        );
 
-    for (final address in state.connectedDevices) {
-      await stopSensors(address);
-      await disconnectDevice(address);
-    }
+        // Update session with result
+        final updatedResults = List<QaResult>.from(state.currentSession!.attemptResults)
+          ..add(updatedResult);
 
-    String? exportPath;
-    if (results.isNotEmpty) {
-      final exportResult = await exportToExcel(results);
-      exportResult.fold(
-            (failure) => exportPath = null,
-            (path) => exportPath = path,
-      );
-    }
+        final updatedSession = state.currentSession!.copyWith(
+          attemptResults: updatedResults,
+        );
+
+        // Disconnect only if passed or final fail (attempt 3)
+        if (updatedResult.passed || state.currentSession!.currentAttempt >= 3) {
+          await _dataSubscription?.cancel();
+          await stopSensors(address);
+          await disconnectDevice(address);
+        }
+
+        emit(state.copyWith(
+          phase: QaTestPhase.completed,
+          currentSession: updatedSession,
+          currentResult: updatedResult,
+          statusMessage: _t('completed'),
+        ));
+      },
+    );
+  }
+
+  Future<void> _onRetryTest(RetryTestEvent event, Emitter<QaState> emit) async {
+    if (state.currentSession == null) return;
+
+    final updatedSession = state.currentSession!.copyWith(
+      currentAttempt: state.currentSession!.currentAttempt + 1,
+    );
 
     emit(state.copyWith(
-      phase: QaTestPhase.completed,
-      results: results,
-      deviceSamples: Map.from(_collectedSamples),
-      statusMessage: exportPath != null
-          ? 'Test completed - Data saved to Excel'
-          : 'Test completed - ${results.length} device(s) evaluated',
-      progress: 1.0,
+      currentSession: updatedSession,
+      clearResult: true,
     ));
 
-    _collectedSamples.clear();
+    // Don't disconnect - reuse connection, just restart data collection
+    add(const StartDataCollectionEvent());
+  }
+
+  Future<void> _onTestNextDevice(TestNextDeviceEvent event, Emitter<QaState> emit) async {
+    // Already disconnected in evaluate result
+
+    // Add to passed devices
+    if (state.currentResult != null && state.currentResult!.passed) {
+      final passed = List<QaResult>.from(state.passedDevices)..add(state.currentResult!);
+      emit(state.copyWith(
+        passedDevices: passed,
+        clearSession: true,
+        clearResult: true,
+        connectedDeviceAddress: null,
+        phase: QaTestPhase.idle,
+      ));
+    }
+  }
+
+  Future<void> _onDiscardDevice(DiscardDeviceEvent event, Emitter<QaState> emit) async {
+    if (state.currentSession == null) return;
+
+    // Already disconnected in evaluate result
+
+    final badDevice = BadDevice(
+      macAddress: state.currentSession!.macAddress,
+      deviceName: state.currentSession!.deviceName,
+      failedAt: DateTime.now(),
+    );
+
+    final bad = List<BadDevice>.from(state.badDevices)..add(badDevice);
+
+    emit(state.copyWith(
+      badDevices: bad,
+      clearSession: true,
+      clearResult: true,
+      connectedDeviceAddress: null,
+      phase: QaTestPhase.idle,
+    ));
+  }
+
+  Future<void> _onStopTest(StopTestEvent event, Emitter<QaState> emit) async {
+    await _cleanup();
+    emit(state.copyWith(
+      phase: QaTestPhase.idle,
+      clearSession: true,
+      clearResult: true,
+      progress: 0.0,
+      foundDevices: [],
+      connectedDeviceAddress: null,
+    ));
   }
 
   Future<void> _onReset(ResetTestEvent event, Emitter<QaState> emit) async {
     await _cleanup();
-    emit(state.copyWith(
-      phase: QaTestPhase.initializing,
-      statusMessage: 'Initializing...',
-      targetDeviceCount: 0,
-      foundDevices: [],
-      connectedDevices: [],
-      results: [],
-      deviceSamples: {},
-      sampleCounts: {},
-      errorMessage: null,
-      progress: 0.0,
-      isShaking: false,
+    emit(QaState.initial().copyWith(
+      currentLanguage: state.currentLanguage,
+      badDevices: state.badDevices,
+      passedDevices: state.passedDevices,
     ));
-
-    add(InitializeQaEvent());
-  }
-
-  Future<void> _onCancel(CancelTestEvent event, Emitter<QaState> emit) async {
-    await _cleanup();
-    emit(state.copyWith(
-      phase: QaTestPhase.initializing,
-      statusMessage: 'Restarting...',
-      targetDeviceCount: 0,
-      foundDevices: [],
-      connectedDevices: [],
-      results: [],
-      deviceSamples: {},
-      sampleCounts: {},
-      errorMessage: null,
-      progress: 0.0,
-      isShaking: false,
-    ));
-
-    add(InitializeQaEvent());
+    add(const InitializeQaEvent());
   }
 
   Future<void> _cleanup() async {
     _progressTimer?.cancel();
     await _scanSubscription?.cancel();
+    await _dataSubscription?.cancel();
 
-    for (final subscription in _dataSubscriptions.values) {
-      await subscription.cancel();
-    }
-    _dataSubscriptions.clear();
-
-    for (final address in state.connectedDevices) {
-      await stopSensors(address);
-      await disconnectDevice(address);
+    if (state.connectedDeviceAddress != null) {
+      await stopSensors(state.connectedDeviceAddress!);
+      await disconnectDevice(state.connectedDeviceAddress!);
     }
 
     await stopScan();
     _collectedSamples.clear();
-    _saturationCounts.clear(); // Add this
-    _recentAccelMagnitudes.clear();
+    _saturationCounts.clear();
   }
 
   @override

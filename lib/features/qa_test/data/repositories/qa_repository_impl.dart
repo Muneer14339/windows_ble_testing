@@ -99,6 +99,7 @@ class QaRepositoryImpl implements QaRepository {
       if (samples.isEmpty) {
         return Right(QaResult(
           deviceId: deviceId,
+          macAddress: deviceId,
           passed: false,
           failureReason: QaFailureReason.none,
           saturationCount: 0,
@@ -133,6 +134,7 @@ class QaRepositoryImpl implements QaRepository {
       if (saturationCount > 5) {
         return Right(QaResult(
           deviceId: deviceId,
+          macAddress: deviceId,
           passed: false,
           failureReason: QaFailureReason.saturationRaw,
           saturationCount: saturationCount,
@@ -178,6 +180,7 @@ class QaRepositoryImpl implements QaRepository {
 
       return Right(QaResult(
         deviceId: deviceId,
+        macAddress: deviceId,
         passed: passed,
         failureReason: passed ? QaFailureReason.none : QaFailureReason.gyroDeltaSpike,
         saturationCount: 0,

@@ -1,0 +1,161 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/localization/app_translations.dart';
+import '../bloc/qa_bloc.dart';
+import '../bloc/qa_event.dart';
+
+class InitialScreen extends StatelessWidget {
+  final bool isLoading;
+  final String language;
+
+  const InitialScreen({
+    super.key,
+    this.isLoading = false,
+    required this.language,
+  });
+
+  String _t(String key) => AppTranslations.translate(key, language);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildLogo(),
+            const SizedBox(height: 30),
+            _buildRulesCard(),
+            const SizedBox(height: 30),
+            _buildStartButton(context),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: BoxDecoration(
+        color: AppColors.blue,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.blueWithOpacity(0.3),
+            blurRadius: 30,
+            spreadRadius: 10,
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Text(
+          'RA',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRulesCard() {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 600),
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.blueWithOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            _t('rulesTitle'),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: AppColors.blue,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildRule('1', _t('rule1')),
+          _buildRule('2', _t('rule2')),
+          _buildRule('3', _t('rule3')),
+          _buildRule('4', _t('rule4')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRule(String number, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 15),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$number. ',
+            style: const TextStyle(
+              color: AppColors.blue,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                height: 1.6,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStartButton(BuildContext context) {
+    return ElevatedButton(
+      onPressed: isLoading
+          ? null
+          : () => context.read<QaBloc>().add(const StartTestEvent()),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.blue,
+        disabledBackgroundColor: AppColors.blueWithOpacity(0.3),
+        padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 18),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        elevation: 10,
+      ),
+      child: isLoading
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : Text(
+              _t('startBtn'),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+    );
+  }
+}

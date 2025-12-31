@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const primary = Color(0xFF0A0E27);
-  static const secondary = Color(0xFF1A1F3A);
-  static const surface = Color(0xFF151B35);
-  static const cardGradientStart = Color(0xFF1E2749);
-  static const cardGradientEnd = Color(0xFF151B35);
+  static const primary = Color(0xFF1e2a47);
+  static const secondary = Color(0xFF2d3f5f);
+  static const surface = Color(0xFF243555);
+  static const cardGradientStart = Color(0xFF1e2949);
+  static const cardGradientEnd = Color(0xFF1a2238);
 
-  static const blue = Colors.blue;
-  static const green = Colors.green;
+  static const blue = Color(0xFF3b82f6);
+  static const green = Color(0xFF10b981);
   static const orange = Colors.orange;
-  static const red = Colors.red;
+  static const red = Color(0xFFef4444);
   static const white = Colors.white;
 
   static Color blueWithOpacity(double opacity) => blue.withOpacity(opacity);
@@ -31,6 +31,7 @@ class AppTextStyles {
   static const subtitle = TextStyle(
     fontSize: 14,
     letterSpacing: 0.3,
+    color: Color(0xFF94a3b8),
   );
 
   static const heading = TextStyle(

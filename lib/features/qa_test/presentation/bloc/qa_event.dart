@@ -7,18 +7,17 @@ abstract class QaEvent extends Equatable {
   List<Object?> get props => [];
 }
 
-class InitializeQaEvent extends QaEvent {}
-
-class StartScanningEvent extends QaEvent {
-  final int targetDeviceCount;
-
-  const StartScanningEvent(this.targetDeviceCount);
-
-  @override
-  List<Object?> get props => [targetDeviceCount];
+class InitializeQaEvent extends QaEvent {
+  const InitializeQaEvent();
 }
 
-class StopScanningEvent extends QaEvent {}
+class ToggleLanguageEvent extends QaEvent {
+  const ToggleLanguageEvent();
+}
+
+class StartTestEvent extends QaEvent {
+  const StartTestEvent();
+}
 
 class DeviceFoundEvent extends QaEvent {
   final String name;
@@ -35,21 +34,17 @@ class DeviceFoundEvent extends QaEvent {
   List<Object?> get props => [name, address, rssi];
 }
 
-class ConnectDevicesEvent extends QaEvent {}
-
-class StartShakingEvent extends QaEvent {}  // NEW
-
-class UpdateShakingEvent extends QaEvent {  // NEW
-  final double progress;
-  final bool isShaking;
-
-  const UpdateShakingEvent(this.progress, this.isShaking);
-
-  @override
-  List<Object?> get props => [progress, isShaking];
+class ConnectFirstDeviceEvent extends QaEvent {
+  const ConnectFirstDeviceEvent();
 }
 
-class StartTestEvent extends QaEvent {}
+class StartSensorsEvent extends QaEvent {
+  const StartSensorsEvent();
+}
+
+class StartDataCollectionEvent extends QaEvent {
+  const StartDataCollectionEvent();
+}
 
 class UpdateProgressEvent extends QaEvent {
   final double progress;
@@ -60,13 +55,10 @@ class UpdateProgressEvent extends QaEvent {
   List<Object?> get props => [progress];
 }
 
-class EvaluateResultsEvent extends QaEvent {}
+class EvaluateResultEvent extends QaEvent {
+  const EvaluateResultEvent();
+}
 
-class ResetTestEvent extends QaEvent {}
-
-class CancelTestEvent extends QaEvent {}
-
-// In qa_event.dart
 class HardFailDetectedEvent extends QaEvent {
   final String address;
 
@@ -74,4 +66,24 @@ class HardFailDetectedEvent extends QaEvent {
 
   @override
   List<Object?> get props => [address];
+}
+
+class RetryTestEvent extends QaEvent {
+  const RetryTestEvent();
+}
+
+class TestNextDeviceEvent extends QaEvent {
+  const TestNextDeviceEvent();
+}
+
+class DiscardDeviceEvent extends QaEvent {
+  const DiscardDeviceEvent();
+}
+
+class StopTestEvent extends QaEvent {
+  const StopTestEvent();
+}
+
+class ResetTestEvent extends QaEvent {
+  const ResetTestEvent();
 }
