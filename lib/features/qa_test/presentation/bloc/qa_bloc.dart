@@ -55,6 +55,7 @@ class QaBloc extends Bloc<QaEvent, QaState> {
     on<ResetTestEvent>(_onReset);
     on<DataStreamErrorEvent>(_onDataStreamError);
     on<DeviceDisconnectedEvent>(_onDeviceDisconnected);
+    on<ExportResultEvent>(_onExportResult);
   }
 
   String _t(String key, {List<String>? args}) {
@@ -363,10 +364,32 @@ class QaBloc extends Bloc<QaEvent, QaState> {
           currentResult: updatedResult,
           statusMessage: _t('completed'),
         ));
+        add(const ExportResultEvent());
       },
     );
   }
+// Naya handler add karo
+  Future<void> _onExportResult(ExportResultEvent event, Emitter<QaState> emit) async {
+    if (state.currentResult == null) return;
 
+    final allResults = [
+      ...state.passedDevices,
+      ...state.badDevices.map((d) => QaResult(
+        deviceId: d.macAddress,
+        macAddress: d.macAddress,
+        passed: false,
+        failureReason: QaFailureReason.none,
+        saturationCount: 0,
+        spikeCount: 0,
+        maxAbsRaw: 0,
+        maxDelta: 0,
+      )),
+    ];
+
+    if (allResults.isNotEmpty) {
+      await exportToExcel(allResults);
+    }
+  }
   Future<void> _onRetryTest(RetryTestEvent event, Emitter<QaState> emit) async {
     if (state.currentSession == null) return;
 

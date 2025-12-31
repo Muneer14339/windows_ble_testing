@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/localization/app_translations.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../bloc/qa_bloc.dart';
 import '../bloc/qa_event.dart';
 
@@ -37,31 +38,7 @@ class InitialScreen extends StatelessWidget {
   }
 
   Widget _buildLogo() {
-    return Container(
-      width: 100,
-      height: 100,
-      decoration: BoxDecoration(
-        color: AppColors.blue,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.blueWithOpacity(0.3),
-            blurRadius: 30,
-            spreadRadius: 10,
-          ),
-        ],
-      ),
-      child: const Center(
-        child: Text(
-          'RA',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
+    return const AppLogo(size: 100, withShadow: true);
   }
 
   Widget _buildRulesCard() {

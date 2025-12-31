@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/localization/app_translations.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../bloc/qa_bloc.dart';
 import '../bloc/qa_event.dart';
 import '../bloc/qa_state.dart';
@@ -93,24 +94,7 @@ class _QaTestPageState extends State<QaTestPage> {
       child: Row(
         children: [
           // App Icon & Title
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.blue,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Center(
-              child: Text(
-                'RA',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+          const AppLogo(size: 40),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

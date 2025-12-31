@@ -94,3 +94,7 @@ class DataStreamErrorEvent extends QaEvent {
 class DeviceDisconnectedEvent extends QaEvent {
   const DeviceDisconnectedEvent();
 }
+
+class ExportResultEvent extends QaEvent {
+  const ExportResultEvent();
+}

@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../bloc/qa_bloc.dart';
 import '../bloc/qa_event.dart';
+import 'device_list_widget.dart';
 
 class ResultsBadView extends StatelessWidget {
   final QaResult result;
@@ -97,10 +98,24 @@ class ResultsBadView extends StatelessWidget {
                 ],
               ),
             ),
-            if (badDevices.isNotEmpty) ...[
-              const SizedBox(height: 24),
-              _buildBadDevicesList(),
-            ],
+            const SizedBox(height: 24),
+            DeviceListWidget(
+              title: _t('passedDevicesTitle'),
+              devices: context.read<QaBloc>().state.passedDevices,
+              isPassed: true,
+              language: language,
+            ),
+            const SizedBox(height: 16),
+            DeviceListWidget(
+              title: _t('failedDevicesTitle'),
+              devices: badDevices,
+              isPassed: false,
+              language: language,
+            ),
+            // if (badDevices.isNotEmpty) ...[
+            //   const SizedBox(height: 24),
+            //   _buildBadDevicesList(),
+            // ],
           ],
         ),
       ),

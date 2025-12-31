@@ -58,6 +58,9 @@ class AppTranslations {
       'testedDevicesPass': '已测试 1 个设备',
       'attemptInfo': '第 1 次尝试通过',
       'passStatus': '通过',
+
+      'passedDevicesTitle': '✓ 已通过设备',
+      'failedDevicesTitle': '✗ 已失败设备',
       
       // Results - Fail
       'testFailTitle': '测试失败',
@@ -158,6 +161,9 @@ class AppTranslations {
       'testedDevicesPass': 'Tested 1 device',
       'attemptInfo': 'Passed on attempt 1',
       'passStatus': 'PASS',
+
+      'passedDevicesTitle': '✓ Passed Devices',
+      'failedDevicesTitle': '✗ Failed Devices',
       
       // Results - Fail
       'testFailTitle': 'Test Failed',
