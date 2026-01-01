@@ -56,7 +56,7 @@ class AppTranslations {
       // Results - Pass
       'testPassTitle': '测试通过',
       'testedDevicesPass': '已测试 1 个设备',
-      'attemptInfo': '第 1 次尝试通过',
+      'attemptInfo': '第 次尝试通过',
       'passStatus': '通过',
 
       'passedDevicesTitle': '✓ 已通过设备',
@@ -65,7 +65,7 @@ class AppTranslations {
       // Results - Fail
       'testFailTitle': '测试失败',
       'testedDevicesFail': '已测试 1 个设备 - 尝试',
-      'attemptInfoFail': '第 1 次尝试失败',
+      'attemptInfoFail': '第 次尝试失败',
       'failStatus': '失败',
       
       // Results - Bad Sensor
@@ -159,7 +159,7 @@ class AppTranslations {
       // Results - Pass
       'testPassTitle': 'Test Passed',
       'testedDevicesPass': 'Tested 1 device',
-      'attemptInfo': 'Passed on attempt 1',
+      'attemptInfo': 'Passed on attempt',
       'passStatus': 'PASS',
 
       'passedDevicesTitle': '✓ Passed Devices',
@@ -168,7 +168,7 @@ class AppTranslations {
       // Results - Fail
       'testFailTitle': 'Test Failed',
       'testedDevicesFail': 'Tested 1 device - Attempt',
-      'attemptInfoFail': 'Failed on attempt 1',
+      'attemptInfoFail': 'Failed on attempt ',
       'failStatus': 'FAIL',
       
       // Results - Bad Sensor

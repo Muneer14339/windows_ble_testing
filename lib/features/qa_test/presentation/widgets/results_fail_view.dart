@@ -65,9 +65,7 @@ class ResultsFailView extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                language == 'zh' 
-                    ? '第 $attemptNumber 次尝试失败'
-                    : 'Failed on attempt $attemptNumber',
+                '${_t('attemptInfoFail')} ${result.attemptNumber} ',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
