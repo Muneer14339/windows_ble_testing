@@ -177,7 +177,24 @@ class _QaTestPageState extends State<QaTestPage> {
     );
   }
 
+  // lib/features/qa_test/presentation/pages/qa_test_page.dart
+
   Widget _buildContent(BuildContext context, QaState state) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(
+              child: _getScreenWidget(state),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _getScreenWidget(QaState state) {
     switch (state.phase) {
       case QaTestPhase.idle:
       case QaTestPhase.initializing:
