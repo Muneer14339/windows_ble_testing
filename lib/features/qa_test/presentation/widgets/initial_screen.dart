@@ -41,6 +41,8 @@ class InitialScreen extends StatelessWidget {
     );
   }
 
+  // Replace _buildRulesCard method:
+
   Widget _buildRulesCard() {
     return Container(
       constraints: const BoxConstraints(maxWidth: 600),
@@ -69,11 +71,6 @@ class InitialScreen extends StatelessWidget {
           const SizedBox(height: 12),
           _buildRule('1.', _t('rule1')),
           _buildRule('2.', _t('rule2')),
-          _buildSubRule(_t('rule2Sub1')),
-          _buildSubRule(_t('rule2Sub2')),
-          _buildRule('3.', _t('rule3')),
-          _buildSubRule(_t('rule3Sub1')),
-          _buildSubRule(_t('rule3Sub2')),
           const SizedBox(height: 8),
           Center(
             child: Text(

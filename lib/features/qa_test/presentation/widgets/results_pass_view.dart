@@ -62,14 +62,6 @@ class ResultsPassView extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                '${_t('attemptInfo')} ${result.attemptNumber} ',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
-              ),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,

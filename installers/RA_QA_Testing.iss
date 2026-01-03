@@ -2,16 +2,16 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 ; Non-commercial use only
 
-#define MyAppName "RA QA Tester"
+#define MyAppName "RA_QA_Testing"
 #define MyAppVersion "1.5"
-#define MyAppPublisher "Holistic TLC"
+#define MyAppPublisher " Holistic TLC Corporation"
 #define MyAppURL "https://www.example.com/"
 #define MyAppExeName "flutter_windows_ble.exe"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application. Do not use the same AppId value in installers for other applications.
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
-AppId={{1D94AA79-D040-4A0B-9DA5-1DD6C23C4627}
+AppId={{9F6366CB-96E8-44C0-8413-D9FE98DC5141}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 ;AppVerName={#MyAppName} {#MyAppVersion}
@@ -33,8 +33,8 @@ DisableProgramGroupPage=yes
 ; Uncomment the following line to run in non administrative install mode (install for current user only).
 ;PrivilegesRequired=lowest
 OutputDir=C:\Users\GM\Documents\StudioProjects\flutter_windows_ble\installers
-OutputBaseFilename=RA_QA_Tester
-SetupIconFile=C:\Users\GM\Downloads\RA_Device_Tester_icon_matte_HD_v2.ico
+OutputBaseFilename=RA_QA_Testing
+SetupIconFile=C:\Users\GM\Documents\StudioProjects\flutter_windows_ble\installers\RA_Device_Tester_icon.ico
 SolidCompression=yes
 WizardStyle=modern dynamic
 

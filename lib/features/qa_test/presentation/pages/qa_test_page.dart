@@ -234,16 +234,10 @@ class _QaTestPageState extends State<QaTestPage> {
             result: state.currentResult!,
             language: state.currentLanguage,
           );
-        } else if (state.currentSession!.currentAttempt >= 3) {
+        } else {
           return ResultsBadView(
             result: state.currentResult!,
             badDevices: state.badDevices,
-            language: state.currentLanguage,
-          );
-        } else {
-          return ResultsFailView(
-            result: state.currentResult!,
-            attemptNumber: state.currentSession!.currentAttempt,
             language: state.currentLanguage,
           );
         }

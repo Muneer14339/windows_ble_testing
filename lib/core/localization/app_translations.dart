@@ -23,14 +23,9 @@ class AppTranslations {
       
       // Initial Screen
       'rulesTitle': '测试规则',
-      'rule1': '第一次测试通过 → 设备良好，继续下一个测试',
-      'rule2': '第一次测试失败 → 重新测试（第二次尝试）',
-      'rule2Sub1': '第二次通过 → 设备良好，测试下一个',
-      'rule2Sub2': '第二次失败 → 重新测试（第三次尝试）',
-      'rule3': '第三次测试：',
-      'rule3Sub1': '通过 → 设备良好，测试下一个',
-      'rule3Sub2': '失败 → 标记为坏传感器并丢弃',
-      'rulesNote': '每个设备最多可尝试 3 次',
+      'rule1': '测试通过 → 设备良好，继续下一个测试',
+      'rule2': '测试失败 → 标记为坏传感器并丢弃',
+      'rulesNote': '每个设备仅测试一次',
       
       // Scanning Screen
       'scanningTitle': '扫描设备',
@@ -55,7 +50,7 @@ class AppTranslations {
       
       // Results - Pass
       'testPassTitle': '测试通过',
-      'testedDevicesPass': '已测试 1 个设备',
+      'testedDevicesPass': '通过 QA 测试',
       'attemptInfo': '第 次尝试通过',
       'passStatus': '通过',
 
@@ -64,7 +59,7 @@ class AppTranslations {
       
       // Results - Fail
       'testFailTitle': '测试失败',
-      'testedDevicesFail': '已测试 1 个设备 - 尝试',
+      'testedDevicesFail': '未通过 QA 测试',
       'attemptInfoFail': '第 次尝试失败',
       'failStatus': '失败',
       
@@ -126,14 +121,9 @@ class AppTranslations {
       
       // Initial Screen
       'rulesTitle': 'Test rules',
-      'rule1': 'First test passed → Equipment is good, proceed to the next test.',
-      'rule2': 'First test failed → Retest (second attempt)',
-      'rule2Sub1': 'Passed the second time → Equipment is good, test the next one.',
-      'rule2Sub2': 'Second failure → Retest (third attempt)',
-      'rule3': 'Third test:',
-      'rule3Sub1': 'Pass → Equipment is good, test the next one.',
-      'rule3Sub2': 'Failure → Mark as bad sensor and set aside',
-      'rulesNote': 'Each device can attempt a maximum of 3 times.',
+      'rule1': 'Test passed → Equipment is good, proceed to next test',
+      'rule2': 'Test failed → Mark as bad sensor and discard',
+      'rulesNote': 'Each device is tested only once',
       
       // Scanning Screen
       'scanningTitle': 'Scanning for Devices',
@@ -158,7 +148,7 @@ class AppTranslations {
       
       // Results - Pass
       'testPassTitle': 'Test Passed',
-      'testedDevicesPass': 'Tested 1 device',
+      'testedDevicesPass': 'Pass QA Test',
       'attemptInfo': 'Passed on attempt',
       'passStatus': 'PASS',
 
@@ -167,7 +157,7 @@ class AppTranslations {
       
       // Results - Fail
       'testFailTitle': 'Test Failed',
-      'testedDevicesFail': 'Tested 1 device - Attempt',
+      'testedDevicesFail': 'Failed QA Test!',
       'attemptInfoFail': 'Failed on attempt ',
       'failStatus': 'FAIL',
       

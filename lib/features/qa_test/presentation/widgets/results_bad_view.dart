@@ -46,7 +46,7 @@ class ResultsBadView extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    _t('failedAttempts'),
+                    _t('testedDevicesFail'),
                     style: TextStyle(
                       fontSize: 16,
                       color: AppColors.whiteWithOpacity(0.7),
@@ -63,14 +63,6 @@ class ResultsBadView extends StatelessWidget {
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _t('attemptInfoBad'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
                     ),
                   ),
                   const SizedBox(height: 40),

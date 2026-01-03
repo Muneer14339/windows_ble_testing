@@ -309,7 +309,6 @@ class QaBloc extends Bloc<QaEvent, QaState> {
 
   Future<void> _onEvaluateResult(EvaluateResultEvent event, Emitter<QaState> emit) async {
     _progressTimer?.cancel();
-    // DON'T cancel data subscription - needed for retry
 
     final address = state.connectedDeviceAddress;
     if (address == null || state.currentSession == null) return;
@@ -340,10 +339,10 @@ class QaBloc extends Bloc<QaEvent, QaState> {
           spikeCount: qaResult.spikeCount,
           maxAbsRaw: qaResult.maxAbsRaw,
           maxDelta: qaResult.maxDelta,
-          attemptNumber: state.currentSession!.currentAttempt,
+          attemptNumber: 1,
+          isBadSensor: !qaResult.passed,
         );
 
-        // Update session with result
         final updatedResults = List<QaResult>.from(state.currentSession!.attemptResults)
           ..add(updatedResult);
 
@@ -351,12 +350,10 @@ class QaBloc extends Bloc<QaEvent, QaState> {
           attemptResults: updatedResults,
         );
 
-        // Disconnect only if passed or final fail (attempt 3)
-        if (updatedResult.passed || state.currentSession!.currentAttempt >= 3) {
-          await _dataSubscription?.cancel();
-          await stopSensors(address);
-          await disconnectDevice(address);
-        }
+        // Always disconnect after evaluation
+        await _dataSubscription?.cancel();
+        await stopSensors(address);
+        await disconnectDevice(address);
 
         emit(state.copyWith(
           phase: QaTestPhase.completed,
@@ -364,11 +361,12 @@ class QaBloc extends Bloc<QaEvent, QaState> {
           currentResult: updatedResult,
           statusMessage: _t('completed'),
         ));
+
         add(const ExportResultEvent());
       },
     );
   }
-// Naya handler add karo
+  // Naya handler add karo
   Future<void> _onExportResult(ExportResultEvent event, Emitter<QaState> emit) async {
     if (state.currentResult == null) return;
 
