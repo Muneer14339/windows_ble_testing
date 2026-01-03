@@ -1,32 +1,22 @@
+import 'package:bitsdojo_window/bitsdojo_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:window_manager/window_manager.dart';
 import 'injection.dart' as di;
 import 'features/qa_test/presentation/bloc/qa_bloc.dart';
 import 'features/qa_test/presentation/pages/qa_test_page.dart';
 
 // lib/main.dart
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await di.init();
 
-  await windowManager.ensureInitialized();
-
-  WindowOptions windowOptions = const WindowOptions(
-    minimumSize: Size(850, 650),
-    center: true,
-    skipTaskbar: false,
-    titleBarStyle: TitleBarStyle.normal,
-  );
-
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.show();
-    await windowManager.maximize();
-    await windowManager.focus();
-  });
-
   runApp(const MyApp());
+
+  doWhenWindowReady(() {
+    appWindow.minSize = const Size(850, 650);
+    appWindow.maximize();
+    appWindow.show();
+  });
 }
 
 class MyApp extends StatelessWidget {
