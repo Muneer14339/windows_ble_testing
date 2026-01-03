@@ -42,8 +42,9 @@ class ResultsPassView extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
+              // Replace line ~48:
               Text(
-                _t('testedDevicesPass'),
+                '${_t('device')} ${result.macAddress} - ${_t('testedDevicesPass')}',
                 style: TextStyle(
                   fontSize: 16,
                   color: AppColors.whiteWithOpacity(0.7),

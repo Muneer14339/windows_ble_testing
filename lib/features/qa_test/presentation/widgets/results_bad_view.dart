@@ -45,8 +45,9 @@ class ResultsBadView extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
+                  // Replace line ~46:
                   Text(
-                    _t('testedDevicesFail'),
+                    '${_t('device')} ${result.macAddress} - ${_t('testedDevicesFail')}',
                     style: TextStyle(
                       fontSize: 16,
                       color: AppColors.whiteWithOpacity(0.7),
